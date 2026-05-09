@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/.well-known/agent")({
+export const Route = createFileRoute("/.well-known/agent.json")({
   server: {
     handlers: {
       GET: async ({ request }) => {
