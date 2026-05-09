@@ -10,33 +10,54 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DotwellKnownAgentDotjsonRouteImport } from './routes/[.]well-known.agent[.]json'
+import { Route as ApiV1QuoteRouteImport } from './routes/api/v1/quote'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DotwellKnownAgentDotjsonRoute =
+  DotwellKnownAgentDotjsonRouteImport.update({
+    id: '/.well-known/agent.json',
+    path: '/.well-known/agent.json',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiV1QuoteRoute = ApiV1QuoteRouteImport.update({
+  id: '/api/v1/quote',
+  path: '/api/v1/quote',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/.well-known/agent.json': typeof DotwellKnownAgentDotjsonRoute
+  '/api/v1/quote': typeof ApiV1QuoteRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/.well-known/agent.json': typeof DotwellKnownAgentDotjsonRoute
+  '/api/v1/quote': typeof ApiV1QuoteRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/.well-known/agent.json': typeof DotwellKnownAgentDotjsonRoute
+  '/api/v1/quote': typeof ApiV1QuoteRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/.well-known/agent.json' | '/api/v1/quote'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/.well-known/agent.json' | '/api/v1/quote'
+  id: '__root__' | '/' | '/.well-known/agent.json' | '/api/v1/quote'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DotwellKnownAgentDotjsonRoute: typeof DotwellKnownAgentDotjsonRoute
+  ApiV1QuoteRoute: typeof ApiV1QuoteRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +69,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/.well-known/agent.json': {
+      id: '/.well-known/agent.json'
+      path: '/.well-known/agent.json'
+      fullPath: '/.well-known/agent.json'
+      preLoaderRoute: typeof DotwellKnownAgentDotjsonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/quote': {
+      id: '/api/v1/quote'
+      path: '/api/v1/quote'
+      fullPath: '/api/v1/quote'
+      preLoaderRoute: typeof ApiV1QuoteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DotwellKnownAgentDotjsonRoute: DotwellKnownAgentDotjsonRoute,
+  ApiV1QuoteRoute: ApiV1QuoteRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
