@@ -45,7 +45,7 @@ function Dashboard() {
           id: crypto.randomUUID(),
           txHash: shortHash(),
           amount: "0.05",
-          chain: Math.random() > 0.4 ? "Base" : "Ethereum",
+          chain: (Math.random() > 0.4 ? "Base" : "Ethereum") as "Base" | "Ethereum",
           pair: SAMPLE_PAIRS[Math.floor(Math.random() * SAMPLE_PAIRS.length)],
           ts: Date.now(),
           agent: SAMPLE_AGENTS[Math.floor(Math.random() * SAMPLE_AGENTS.length)],
