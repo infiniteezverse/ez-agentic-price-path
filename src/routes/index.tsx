@@ -359,7 +359,7 @@ function seedFeed(): FeedItem[] {
     id: crypto.randomUUID?.() ?? String(Math.random()),
     txHash: shortHash(),
     amount: "0.05",
-    chain: i % 2 === 0 ? "Base" : "Ethereum",
+    chain: (i % 2 === 0 ? "Base" : "Ethereum") as "Base" | "Ethereum",
     pair: SAMPLE_PAIRS[i % SAMPLE_PAIRS.length],
     agent: SAMPLE_AGENTS[i % SAMPLE_AGENTS.length],
     ts: now - i * 18_000,
