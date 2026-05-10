@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { fetch0xQuote, resolveToken } from "@/lib/liquidity.server";
+import { verifyOnChainReceipt } from "@/lib/receipt-verify.server";
+import { logQuoteCall } from "@/lib/quote-log.server";
 
 const QuerySchema = z.object({
   buyToken: z.string().min(1).max(64),
@@ -62,9 +64,25 @@ export const Route = createFileRoute("/api/v1/quote")({
           );
         }
 
-        // X402 tollbooth
+        // X402 tollbooth — real on-chain verification
         const receipt = request.headers.get(RECEIPT_HEADER) ?? request.headers.get(PAYMENT_HEADER);
-        const valid = await verifyReceipt(receipt);
+        const verification = await verifyOnChainReceipt(receipt);
+        const valid = verification.ok;
+        const ip = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for");
+        const userAgent = request.headers.get("user-agent");
+
+        // Fire-and-forget log (await so serverless completes before response)
+        await logQuoteCall({
+          chainId,
+          sellSymbol: sellTok.symbol,
+          buySymbol: buyTok.symbol,
+          sellAmount,
+          receipt,
+          verification,
+          unlocked: valid,
+          ip,
+          userAgent,
+        });
 
         if (!valid) {
           const wallet = process.env.PAYMENT_WALLET_ADDRESS ?? "0x0000000000000000000000000000000000000000";
@@ -99,6 +117,8 @@ export const Route = createFileRoute("/api/v1/quote")({
             top_source: quote.sources?.[0]?.name ?? null,
             status: "Locked",
             unlock_fee: `${UNLOCK_FEE_USDC} USDC`,
+            receipt_status: receipt ? verification.status : "missing",
+            receipt_error: verification.error ?? null,
             payment: instructions,
           };
           return Response.json(preview, {
@@ -146,10 +166,3 @@ export const Route = createFileRoute("/api/v1/quote")({
   },
 });
 
-// Lightweight receipt check.
-// In production: verify on-chain that `txHash` paid `UNLOCK_FEE_USDC` to PAYMENT_WALLET_ADDRESS recently.
-// Here we accept any 0x-prefixed 32-byte hex hash and treat it as a placeholder ack.
-async function verifyReceipt(receipt: string | null): Promise<boolean> {
-  if (!receipt) return false;
-  return /^0x[a-fA-F0-9]{64}$/.test(receipt);
-}

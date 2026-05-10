@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { getDashboardData } from "@/lib/dashboard.functions";
+import { getRecentTolls, type FeedRow } from "@/lib/feed.functions";
 
 export const Route = createFileRoute("/")({
   component: Dashboard,
@@ -18,14 +19,16 @@ type FeedItem = {
   agent: string;
 };
 
-const SAMPLE_AGENTS = ["agent.eth", "swap-bot-04", "atlas-trader", "0xLiquidityHawk", "neon-router", "merlin.ai", "tessera-fi"];
-const SAMPLE_PAIRS = ["WETH/USDC", "USDC/WETH", "WETH/DAI", "WBTC/USDC", "USDC/cbBTC"];
-
-function shortHash() {
-  const hex = "0123456789abcdef";
-  let s = "0x";
-  for (let i = 0; i < 64; i++) s += hex[Math.floor(Math.random() * 16)];
-  return s;
+function rowToFeedItem(r: FeedRow): FeedItem {
+  return {
+    id: r.id,
+    txHash: r.receipt_tx_hash ?? "0x",
+    amount: (r.payment_amount_usdc ?? 0.05).toString(),
+    chain: r.payment_chain === "ethereum" ? "Ethereum" : "Base",
+    pair: r.pair,
+    ts: new Date(r.created_at).getTime(),
+    agent: r.payer_address ? `${r.payer_address.slice(0, 6)}…${r.payer_address.slice(-4)}` : "anon",
+  };
 }
 
 function Dashboard() {
@@ -36,30 +39,19 @@ function Dashboard() {
     refetchInterval: 12_000,
   });
 
-  // Live toll feed (synthetic — represents real X402 micropayments hitting the API)
-  const [feed, setFeed] = useState<FeedItem[]>([]);
-  useEffect(() => {
-    setFeed(seedFeed());
-  }, []);
-  useEffect(() => {
-    const id = setInterval(() => {
-      setFeed((prev) => [
-        {
-          id: crypto.randomUUID(),
-          txHash: shortHash(),
-          amount: "0.05",
-          chain: (Math.random() > 0.4 ? "Base" : "Ethereum") as "Base" | "Ethereum",
-          pair: SAMPLE_PAIRS[Math.floor(Math.random() * SAMPLE_PAIRS.length)],
-          ts: Date.now(),
-          agent: SAMPLE_AGENTS[Math.floor(Math.random() * SAMPLE_AGENTS.length)],
-        },
-        ...prev,
-      ].slice(0, 16));
-    }, 2400 + Math.random() * 2200);
-    return () => clearInterval(id);
-  }, []);
+  // Real X402 toll feed from on-chain-verified, persisted call log
+  const feedFetcher = useServerFn(getRecentTolls);
+  const { data: feedData } = useQuery({
+    queryKey: ["toll-feed"],
+    queryFn: () => feedFetcher(),
+    refetchInterval: 6_000,
+  });
+  const feed = useMemo<FeedItem[]>(
+    () => (feedData?.rows ?? []).map(rowToFeedItem),
+    [feedData],
+  );
 
-  const totalUnlocks = useMemo(() => feed.length * 47 + 8214, [feed.length]);
+  const totalUnlocks = feedData?.total24h ?? 0;
   const wallet = data?.paymentWallet;
 
   return (
@@ -266,6 +258,11 @@ function FeedPanel({ feed }: { feed: FeedItem[] }) {
         <span className="pulse-dot inline-block h-1.5 w-1.5 rounded-full bg-success text-success" />
       </div>
       <div className="max-h-[420px] overflow-y-auto">
+        {feed.length === 0 && (
+          <div className="px-5 py-10 text-center font-mono text-xs text-muted-foreground">
+            No verified tolls yet — first on-chain X402 unlock will appear here.
+          </div>
+        )}
         {feed.map((f) => (
           <div key={f.id} className="animate-feed-in border-b border-border/40 px-5 py-2.5 last:border-b-0">
             <div className="flex items-center justify-between">
@@ -356,15 +353,3 @@ function timeAgo(ts: number) {
   return `${Math.floor(m / 60)}h ago`;
 }
 
-function seedFeed(): FeedItem[] {
-  const now = Date.now();
-  return Array.from({ length: 8 }).map((_, i) => ({
-    id: crypto.randomUUID?.() ?? String(Math.random()),
-    txHash: shortHash(),
-    amount: "0.05",
-    chain: (i % 2 === 0 ? "Base" : "Ethereum") as "Base" | "Ethereum",
-    pair: SAMPLE_PAIRS[i % SAMPLE_PAIRS.length],
-    agent: SAMPLE_AGENTS[i % SAMPLE_AGENTS.length],
-    ts: now - i * 18_000,
-  }));
-}

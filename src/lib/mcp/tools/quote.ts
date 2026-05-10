@@ -1,6 +1,8 @@
 import { defineTool } from "mcp-tanstack-start";
 import { z } from "zod";
 import { fetch0xQuote, resolveToken } from "@/lib/liquidity.server";
+import { verifyOnChainReceipt } from "@/lib/receipt-verify.server";
+import { logQuoteCall } from "@/lib/quote-log.server";
 
 export const quoteTool = defineTool({
   name: "get_dex_quote",
@@ -44,12 +46,25 @@ export const quoteTool = defineTool({
       sellAmount,
     });
 
-    const unlocked = !!receipt && /^0x[a-fA-F0-9]{64}$/.test(receipt);
+    const verification = await verifyOnChainReceipt(receipt ?? null);
+    const unlocked = verification.ok;
+
+    await logQuoteCall({
+      chainId,
+      sellSymbol: sellTok.symbol,
+      buySymbol: buyTok.symbol,
+      sellAmount,
+      receipt: receipt ?? null,
+      verification,
+      unlocked,
+    });
 
     if (!unlocked) {
       return json({
         status: "Locked",
         unlock_fee: "0.05 USDC",
+        receipt_status: receipt ? verification.status : "missing",
+        receipt_error: verification.error ?? null,
         preview: {
           estimatedSavingsUsd: quote.estimatedSavingsUsd,
           priceImpactPct: quote.priceImpactPct,
