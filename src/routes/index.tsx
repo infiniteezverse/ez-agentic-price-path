@@ -98,8 +98,20 @@ function Header({ wallet, loading }: { wallet?: string | null; loading: boolean 
             <span className="font-mono text-xs text-muted-foreground">{loading ? "syncing" : "live · mainnet + base"}</span>
           </div>
           <a
+            href="/playground"
+            className="rounded-md border border-primary/40 bg-primary/10 px-3 py-1.5 font-mono text-xs text-primary hover:bg-primary/15"
+          >
+            playground →
+          </a>
+          <a
+            href="/openapi.json"
+            className="hidden rounded-md border border-border bg-card/60 px-3 py-1.5 font-mono text-xs text-muted-foreground hover:border-primary/60 hover:text-primary md:inline-block"
+          >
+            /openapi.json
+          </a>
+          <a
             href="/.well-known/agent.json"
-            className="rounded-md border border-border bg-card/60 px-3 py-1.5 font-mono text-xs text-muted-foreground hover:border-primary/60 hover:text-primary"
+            className="hidden rounded-md border border-border bg-card/60 px-3 py-1.5 font-mono text-xs text-muted-foreground hover:border-primary/60 hover:text-primary md:inline-block"
           >
             /.well-known/agent.json
           </a>
