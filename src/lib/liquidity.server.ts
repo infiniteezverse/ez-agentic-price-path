@@ -1,8 +1,6 @@
 // Server-side helpers shared by /api routes and server fns
-const ZEROX_BASE: Record<number, string> = {
-  1: "https://api.0x.org",
-  8453: "https://base.api.0x.org",
-};
+// 0x v2 uses a single host for all chains; chain is selected via the `chainId` query param.
+const ZEROX_HOST = "https://api.0x.org";
 
 // Common token addresses by chain
 export const TOKENS: Record<number, Record<string, { address: string; decimals: number; symbol: string }>> = {
