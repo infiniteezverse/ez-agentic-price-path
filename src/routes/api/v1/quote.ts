@@ -90,29 +90,32 @@ export const Route = createFileRoute("/api/v1/quote")({
             error: err instanceof Error ? err.message : "unknown",
           }));
           return Response.json(
-            { error: "Upstream quote failed", message: err instanceof Error ? err.message : "unknown" },
+            { error: "Upstream quote failed" },
             { status: 502, headers: baseHeaders },
           );
         }
 
         const receipt = request.headers.get(RECEIPT_HEADER) ?? request.headers.get(PAYMENT_HEADER);
         const verification = await verifyOnChainReceipt(receipt);
-        const valid = verification.ok;
         const ip = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for");
         const userAgent = request.headers.get("user-agent");
 
-        await logQuoteCall({
+        const logResult = await logQuoteCall({
           chainId,
           sellSymbol: sellTok.symbol,
           buySymbol: buyTok.symbol,
           sellAmount,
           receipt,
           verification,
-          unlocked: valid,
+          unlocked: verification.ok,
           ip,
           userAgent,
           requestId,
         });
+
+        // If verification passed but the receipt was already consumed by an
+        // earlier unlocked row, treat this call as locked (replay protection).
+        const valid = verification.ok && !logResult.duplicateReceipt;
 
         const savings = Number(quote.estimatedSavingsUsd ?? 0);
         const ms = Date.now() - t0;
@@ -130,6 +133,11 @@ export const Route = createFileRoute("/api/v1/quote")({
             instructions:
               "Send the unlock fee to the payTo address, then resend your request including header `X-Payment-Receipt: <tx-hash>`.",
           };
+          const receiptStatus = logResult.duplicateReceipt
+            ? "already_used"
+            : receipt
+              ? verification.status
+              : "missing";
           const preview = {
             status: "payment_required",
             unlock_fee_usd: UNLOCK_FEE_USD_NUM,
@@ -138,8 +146,10 @@ export const Route = createFileRoute("/api/v1/quote")({
             reason: savings > UNLOCK_FEE_USD_NUM ? "Savings exceed unlock fee" : "Savings below unlock fee",
             price_impact_pct: quote.priceImpactPct,
             top_source: quote.sources?.[0]?.name ?? null,
-            receipt_status: receipt ? verification.status : "missing",
-            receipt_error: verification.error ?? null,
+            receipt_status: receiptStatus,
+            receipt_error: logResult.duplicateReceipt
+              ? "Receipt already consumed by a previous request"
+              : verification.error ?? null,
             request_id: requestId,
             payment: instructions,
           };
