@@ -1,8 +1,6 @@
 // Server-side helpers shared by /api routes and server fns
-const ZEROX_BASE: Record<number, string> = {
-  1: "https://api.0x.org",
-  8453: "https://base.api.0x.org",
-};
+// 0x v2 uses a single host for all chains; chain is selected via the `chainId` query param.
+const ZEROX_HOST = "https://api.0x.org";
 
 // Common token addresses by chain
 export const TOKENS: Record<number, Record<string, { address: string; decimals: number; symbol: string }>> = {
@@ -54,50 +52,56 @@ export async function fetch0xQuote(params: {
   sellAmount: string;
 }): Promise<QuoteResult> {
   const apiKey = process.env.ZEROX_API_KEY;
-  const base = ZEROX_BASE[params.chainId];
-  if (!base) throw new Error(`Unsupported chainId ${params.chainId}`);
+  if (![1, 8453].includes(params.chainId)) {
+    throw new Error(`Unsupported chainId ${params.chainId}`);
+  }
 
-  // Try v2 swap/permit2 endpoint first (current 0x API)
-  const url = new URL(`${base}/swap/permit2/quote`);
+  // Use the indicative `price` endpoint — does not require a real taker address
+  // and is the right choice for read-only quotes / dashboard previews.
+  const url = new URL(`${ZEROX_HOST}/swap/permit2/price`);
   url.searchParams.set("chainId", String(params.chainId));
   url.searchParams.set("buyToken", params.buyToken);
   url.searchParams.set("sellToken", params.sellToken);
   url.searchParams.set("sellAmount", params.sellAmount);
-  url.searchParams.set("taker", "0x0000000000000000000000000000000000000000");
 
-  let res = await fetch(url, {
-    headers: apiKey
-      ? { "0x-api-key": apiKey, "0x-version": "v2" }
-      : { "0x-version": "v2" },
-  });
+  const headers: Record<string, string> = { "0x-version": "v2" };
+  if (apiKey) headers["0x-api-key"] = apiKey;
 
-  // Fallback to legacy v1 if v2 fails
-  if (!res.ok) {
-    const legacy = new URL(`${base}/swap/v1/quote`);
-    legacy.searchParams.set("buyToken", params.buyToken);
-    legacy.searchParams.set("sellToken", params.sellToken);
-    legacy.searchParams.set("sellAmount", params.sellAmount);
-    res = await fetch(legacy, { headers: apiKey ? { "0x-api-key": apiKey } : {} });
-  }
+  const res = await fetch(url, { headers });
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`0x API error [${res.status}]: ${text.slice(0, 200)}`);
+    const reqId = res.headers.get("x-request-id") ?? "";
+    console.error(`[0x] ${res.status} on ${url.pathname} reqId=${reqId} body=${text.slice(0, 300)}`);
+    throw new Error(`0x API error [${res.status}]${reqId ? ` reqId=${reqId}` : ""}: ${text.slice(0, 200)}`);
   }
 
   const data: any = await res.json();
+  // Resolve token decimals so we can derive a human-readable price for v2 responses
+  // (the v2 `price` endpoint returns buyAmount/sellAmount/minBuyAmount but no top-level `price`).
+  const sellTokenInfo = resolveToken(params.chainId, params.sellToken);
+  const buyTokenInfo = resolveToken(params.chainId, params.buyToken);
+  const sellDecimals = sellTokenInfo?.decimals ?? 18;
+  const buyDecimals = buyTokenInfo?.decimals ?? 18;
+
   const buyAmount = String(data.buyAmount ?? "0");
   const sellAmount = String(data.sellAmount ?? params.sellAmount);
-  const price = String(data.price ?? "0");
+
+  // price = buy/sell normalized by decimals (matches v1's price field)
+  const sellHuman = Number(sellAmount) / Math.pow(10, sellDecimals);
+  const buyHuman = Number(buyAmount) / Math.pow(10, buyDecimals);
+  const derivedPrice = sellHuman > 0 ? buyHuman / sellHuman : 0;
+  const price = data.price != null ? String(data.price) : derivedPrice.toString();
+
   const priceImpactPct = data.estimatedPriceImpact != null
     ? Number(data.estimatedPriceImpact)
-    : null;
+    : data.totalNetworkFee != null && buyHuman > 0
+      ? null
+      : null;
 
-  // Estimate "savings vs market" — heuristic: aggregator typically saves 0.1–0.4% over single-venue
-  const sellAmountNum = Number(sellAmount);
-  const naiveOut = sellAmountNum * Number(price) * 0.997; // 0.3% baseline single-pool
-  const realOut = Number(buyAmount);
-  const estimatedSavingsUsd = Math.max(0, (realOut - naiveOut) / Math.pow(10, 6));
+  // Heuristic savings vs single-venue baseline (~0.3% worse execution)
+  const naiveOut = sellHuman * derivedPrice * 0.997;
+  const estimatedSavingsUsd = Math.max(0, (buyHuman - naiveOut));
 
   const sources: Array<{ name: string; proportion: string }> =
     Array.isArray(data.sources)
