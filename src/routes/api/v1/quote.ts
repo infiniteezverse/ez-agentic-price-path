@@ -169,20 +169,18 @@ export const Route = createFileRoute("/api/v1/quote")({
         const ms = Date.now() - t0;
 
         if (!unlocked) {
-          const body = payRequiredBody(origin, paymentReason, {
-            preview: {
-              estimated_savings_usd: Number(savings.toFixed(4)),
-              price_impact_pct: quote.priceImpactPct,
-              top_source: quote.sources?.[0]?.name ?? null,
-              unlock_fee_usd: UNLOCK_FEE_DOLLARS,
-              reason:
-                savings > UNLOCK_FEE_DOLLARS ? "Savings exceed unlock fee" : "Savings below unlock fee",
-            },
-            request_id: requestId,
-          });
+          const preview = {
+            estimated_savings_usd: Number(savings.toFixed(4)),
+            price_impact_pct: quote.priceImpactPct,
+            top_source: quote.sources?.[0]?.name ?? null,
+            unlock_fee_usd: UNLOCK_FEE_DOLLARS,
+            reason:
+              savings > UNLOCK_FEE_DOLLARS ? "Savings exceed unlock fee" : "Savings below unlock fee",
+          };
+          const body = payRequiredBody(origin, paymentReason, { preview, request_id: requestId });
           console.log(JSON.stringify({
             evt: "quote", request_id: requestId, status: 402, chain: chainId, mode: paymentMode,
-            pair: `${sellTok.symbol}/${buyTok.symbol}`, unlocked: false, savings_usd: body.preview.estimated_savings_usd, ms,
+            pair: `${sellTok.symbol}/${buyTok.symbol}`, unlocked: false, savings_usd: preview.estimated_savings_usd, ms,
           }));
           return Response.json(body, {
             status: 402,
