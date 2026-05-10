@@ -9,8 +9,8 @@ import {
   verifyWithCdp,
   settleWithCdp,
   UNLOCK_FEE_DOLLARS,
-  UNLOCK_FEE_ATOMIC,
 } from "@/lib/cdp-facilitator.server";
+import type { VerifyResult } from "@/lib/receipt-verify.server";
 
 const QuerySchema = z.object({
   buyToken: z.string().min(1).max(64),
