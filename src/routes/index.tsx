@@ -348,15 +348,3 @@ function timeAgo(ts: number) {
   return `${Math.floor(m / 60)}h ago`;
 }
 
-function seedFeed(): FeedItem[] {
-  const now = Date.now();
-  return Array.from({ length: 8 }).map((_, i) => ({
-    id: crypto.randomUUID?.() ?? String(Math.random()),
-    txHash: shortHash(),
-    amount: "0.05",
-    chain: (i % 2 === 0 ? "Base" : "Ethereum") as "Base" | "Ethereum",
-    pair: SAMPLE_PAIRS[i % SAMPLE_PAIRS.length],
-    agent: SAMPLE_AGENTS[i % SAMPLE_AGENTS.length],
-    ts: now - i * 18_000,
-  }));
-}
