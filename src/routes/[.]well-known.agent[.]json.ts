@@ -55,6 +55,12 @@ export const Route = createFileRoute("/.well-known/agent.json")({
                 docs:
                   "Request without a receipt header returns HTTP 402 with a preview body and full payment instructions in `payment`. Resend with `X-Payment-Receipt: <txhash>` to unlock the full quote.",
               },
+              affiliate_fee: {
+                bps: Number(process.env.ZEROX_FEE_BPS ?? "25"),
+                recipient: wallet,
+                description:
+                  "Quotes route through 0x with an integrator fee (swapFeeRecipient/swapFeeBps/swapFeeToken). The fee is taken in buyToken on swap settlement and accrues to the recipient wallet.",
+              },
             },
           ],
           rate_limits: { anonymous_preview_per_minute: 60 },
