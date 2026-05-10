@@ -28,12 +28,13 @@ export const quoteTool = defineTool({
     receipt: z.string().regex(/^0x[a-fA-F0-9]{64}$/).optional().describe("Optional X402 payment receipt: an EVM tx hash for a 0.05 USDC transfer to the tollbooth wallet. Without it, only a locked preview is returned."),
   }),
   execute: async ({ chainId, sellToken, buyToken, sellAmount, receipt }) => {
+    const json = (v: unknown) => JSON.stringify(v, null, 2);
     const sellTok = resolveToken(chainId, sellToken);
     const buyTok = resolveToken(chainId, buyToken);
     if (!sellTok || !buyTok) {
-      return {
+      return json({
         error: `Unknown token symbol on chain ${chainId}. Pass a known symbol (ETH, WETH, USDC, USDT, DAI, WBTC) or a 0x contract address.`,
-      };
+      });
     }
 
     const quote = await fetch0xQuote({
