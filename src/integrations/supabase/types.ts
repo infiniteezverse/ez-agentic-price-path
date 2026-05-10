@@ -26,6 +26,7 @@ export type Database = {
           payment_amount_usdc: number | null
           payment_chain: string | null
           receipt_tx_hash: string | null
+          request_id: string | null
           sell_amount: string
           sell_token: string
           unlocked: boolean
@@ -44,6 +45,7 @@ export type Database = {
           payment_amount_usdc?: number | null
           payment_chain?: string | null
           receipt_tx_hash?: string | null
+          request_id?: string | null
           sell_amount: string
           sell_token: string
           unlocked?: boolean
@@ -62,6 +64,7 @@ export type Database = {
           payment_amount_usdc?: number | null
           payment_chain?: string | null
           receipt_tx_hash?: string | null
+          request_id?: string | null
           sell_amount?: string
           sell_token?: string
           unlocked?: boolean
