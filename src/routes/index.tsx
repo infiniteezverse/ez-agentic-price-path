@@ -258,6 +258,11 @@ function FeedPanel({ feed }: { feed: FeedItem[] }) {
         <span className="pulse-dot inline-block h-1.5 w-1.5 rounded-full bg-success text-success" />
       </div>
       <div className="max-h-[420px] overflow-y-auto">
+        {feed.length === 0 && (
+          <div className="px-5 py-10 text-center font-mono text-xs text-muted-foreground">
+            No verified tolls yet — first on-chain X402 unlock will appear here.
+          </div>
+        )}
         {feed.map((f) => (
           <div key={f.id} className="animate-feed-in border-b border-border/40 px-5 py-2.5 last:border-b-0">
             <div className="flex items-center justify-between">
