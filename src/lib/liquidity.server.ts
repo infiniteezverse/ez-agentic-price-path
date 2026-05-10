@@ -64,6 +64,15 @@ export async function fetch0xQuote(params: {
   url.searchParams.set("sellToken", params.sellToken);
   url.searchParams.set("sellAmount", params.sellAmount);
 
+  // Affiliate fee (0x v2): swapFeeRecipient + swapFeeBps + swapFeeToken must be sent together.
+  const feeRecipient = process.env.PAYMENT_WALLET_ADDRESS;
+  const feeBps = process.env.ZEROX_FEE_BPS ?? "25";
+  if (feeRecipient && /^0x[a-fA-F0-9]{40}$/.test(feeRecipient)) {
+    url.searchParams.set("swapFeeRecipient", feeRecipient);
+    url.searchParams.set("swapFeeBps", feeBps);
+    url.searchParams.set("swapFeeToken", params.buyToken);
+  }
+
   const headers: Record<string, string> = { "0x-version": "v2" };
   if (apiKey) headers["0x-api-key"] = apiKey;
 
