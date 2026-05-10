@@ -3,6 +3,14 @@ import { z } from "zod";
 import { fetch0xQuote, resolveToken } from "@/lib/liquidity.server";
 import { verifyOnChainReceipt } from "@/lib/receipt-verify.server";
 import { logQuoteCall } from "@/lib/quote-log.server";
+import {
+  paymentRequirements,
+  tryDecodePayment,
+  verifyWithCdp,
+  settleWithCdp,
+  UNLOCK_FEE_DOLLARS,
+} from "@/lib/cdp-facilitator.server";
+import type { VerifyResult } from "@/lib/receipt-verify.server";
 
 const QuerySchema = z.object({
   buyToken: z.string().min(1).max(64),
@@ -11,53 +19,58 @@ const QuerySchema = z.object({
   chainId: z.coerce.number().int().refine((c) => c === 1 || c === 8453, "chainId must be 1 or 8453").default(1),
 });
 
-const PAYMENT_HEADER = "x-payment";
-const RECEIPT_HEADER = "x-payment-receipt";
-const UNLOCK_FEE_USDC = "0.05";
-const UNLOCK_FEE_USD_NUM = 0.05;
+const X_PAYMENT = "x-payment";
+const X_PAYMENT_RESPONSE = "x-payment-response";
+const LEGACY_RECEIPT_HEADER = "x-payment-receipt";
 const USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const USDC_ETH = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
 
-function x402Headers(origin: string) {
-  const wallet = process.env.PAYMENT_WALLET_ADDRESS ?? "0x0000000000000000000000000000000000000000";
-  return {
-    "x-402-price": `${UNLOCK_FEE_USDC} USDC`,
-    "x-402-chain": "base",
-    "x-402-address": wallet,
-    "x-402-asset": USDC_BASE,
-    "x-402-jwks": `${origin}/.well-known/jwks.json`,
-  };
-}
-
-function corsHeaders(origin: string, requestId?: string) {
+function corsHeaders(requestId?: string) {
   return {
     "access-control-allow-origin": "*",
     "access-control-allow-methods": "GET, OPTIONS",
     "access-control-allow-headers": "content-type, x-payment, x-payment-receipt",
     "access-control-expose-headers":
-      "x-payment-required, x-payment-instructions, x-request-id, x-402-price, x-402-chain, x-402-address, x-402-asset, x-402-jwks",
-    ...x402Headers(origin),
+      "x-payment-response, x-payment-required, x-request-id",
     ...(requestId ? { "x-request-id": requestId } : {}),
+  };
+}
+
+function payRequiredBody(origin: string, reason: string, extra?: Record<string, unknown>) {
+  const wallet = process.env.PAYMENT_WALLET_ADDRESS ?? "0x0000000000000000000000000000000000000000";
+  return {
+    x402Version: 1,
+    error: reason,
+    accepts: [paymentRequirements(origin)],
+    // Backward-compatible legacy hint for receipt-style callers
+    legacy: {
+      scheme: "x-payment-receipt",
+      unlock_fee: `${UNLOCK_FEE_DOLLARS} USDC`,
+      networks: [
+        { chain: "base", chainId: 8453, asset: "USDC", assetAddress: USDC_BASE, payTo: wallet, amount: String(UNLOCK_FEE_DOLLARS) },
+        { chain: "ethereum", chainId: 1, asset: "USDC", assetAddress: USDC_ETH, payTo: wallet, amount: String(UNLOCK_FEE_DOLLARS) },
+      ],
+      instructions:
+        "Send the unlock fee on-chain, then resend with header `X-Payment-Receipt: <tx-hash>`. Or use x402 X-PAYMENT header (preferred).",
+    },
+    ...(extra ?? {}),
   };
 }
 
 export const Route = createFileRoute("/api/v1/quote")({
   server: {
     handlers: {
-      OPTIONS: async ({ request }) => {
-        const url = new URL(request.url);
-        return new Response(null, { status: 204, headers: corsHeaders(`${url.protocol}//${url.host}`) });
-      },
+      OPTIONS: async () => new Response(null, { status: 204, headers: corsHeaders() }),
+
       GET: async ({ request }) => {
         const t0 = Date.now();
         const url = new URL(request.url);
         const origin = `${url.protocol}//${url.host}`;
         const requestId = crypto.randomUUID();
-        const baseHeaders = corsHeaders(origin, requestId);
+        const baseHeaders = corsHeaders(requestId);
 
         const parsed = QuerySchema.safeParse(Object.fromEntries(url.searchParams));
         if (!parsed.success) {
-          console.log(JSON.stringify({ evt: "quote", request_id: requestId, status: 400, ms: Date.now() - t0 }));
           return Response.json(
             { error: "Invalid params", details: parsed.error.flatten() },
             { status: 400, headers: baseHeaders },
@@ -68,13 +81,55 @@ export const Route = createFileRoute("/api/v1/quote")({
         const sellTok = resolveToken(chainId, sellToken);
         const buyTok = resolveToken(chainId, buyToken);
         if (!sellTok || !buyTok) {
-          console.log(JSON.stringify({ evt: "quote", request_id: requestId, status: 400, chain: chainId, ms: Date.now() - t0 }));
           return Response.json(
             { error: `Unknown token symbol on chain ${chainId}. Pass an address or known symbol.` },
             { status: 400, headers: baseHeaders },
           );
         }
 
+        // ---- Payment resolution ----
+        // Path A: x402 X-PAYMENT header verified via CDP facilitator (preferred).
+        // Path B: legacy X-Payment-Receipt tx-hash verified on-chain.
+        const xPaymentHeader = request.headers.get(X_PAYMENT);
+        const legacyReceipt = request.headers.get(LEGACY_RECEIPT_HEADER);
+        const requirements = paymentRequirements(origin);
+
+        let unlocked = false;
+        let settleResponseHeader: string | null = null;
+        let paymentMode: "x402" | "legacy" | "none" = "none";
+        let paymentReason = "missing";
+        let logReceipt: string | null = null;
+        let logVerification: VerifyResult = { ok: false, status: "missing" } as unknown as VerifyResult;
+
+        if (xPaymentHeader) {
+          paymentMode = "x402";
+          const decoded = tryDecodePayment(xPaymentHeader);
+          if (!decoded) {
+            paymentReason = "invalid_x_payment_header";
+          } else {
+            try {
+              const verifyResult = await verifyWithCdp(decoded, requirements);
+              if (!verifyResult.isValid) {
+                paymentReason = verifyResult.invalidReason ?? "verify_failed";
+              } else {
+                unlocked = true;
+                logReceipt = verifyResult.payer ?? null;
+                logVerification = { ok: true, status: "verified", payer: verifyResult.payer ?? null } as unknown as VerifyResult;
+              }
+            } catch (e) {
+              paymentReason = e instanceof Error ? e.message : "verify_error";
+            }
+          }
+        } else if (legacyReceipt) {
+          paymentMode = "legacy";
+          logReceipt = legacyReceipt;
+          const v = await verifyOnChainReceipt(legacyReceipt);
+          logVerification = { ok: v.ok, status: v.status, error: v.error };
+          if (v.ok) unlocked = true;
+          else paymentReason = v.error ?? v.status;
+        }
+
+        // Fetch quote regardless (we need savings for preview body)
         let quote;
         try {
           quote = await fetch0xQuote({
@@ -84,91 +139,77 @@ export const Route = createFileRoute("/api/v1/quote")({
             sellAmount,
           });
         } catch (err) {
-          console.log(JSON.stringify({
-            evt: "quote", request_id: requestId, status: 502, chain: chainId,
-            pair: `${sellTok.symbol}/${buyTok.symbol}`, ms: Date.now() - t0,
-            error: err instanceof Error ? err.message : "unknown",
-          }));
           return Response.json(
-            { error: "Upstream quote failed" },
+            { error: "Upstream quote failed", details: err instanceof Error ? err.message : "unknown" },
             { status: 502, headers: baseHeaders },
           );
         }
 
-        const receipt = request.headers.get(RECEIPT_HEADER) ?? request.headers.get(PAYMENT_HEADER);
-        const verification = await verifyOnChainReceipt(receipt);
+        // Replay protection on legacy receipts
         const ip = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for");
         const userAgent = request.headers.get("user-agent");
-
         const logResult = await logQuoteCall({
           chainId,
           sellSymbol: sellTok.symbol,
           buySymbol: buyTok.symbol,
           sellAmount,
-          receipt,
-          verification,
-          unlocked: verification.ok,
+          receipt: logReceipt,
+          verification: logVerification,
+          unlocked,
           ip,
           userAgent,
           requestId,
         });
-
-        // If verification passed but the receipt was already consumed by an
-        // earlier unlocked row, treat this call as locked (replay protection).
-        const valid = verification.ok && !logResult.duplicateReceipt;
+        if (paymentMode === "legacy" && logResult.duplicateReceipt) {
+          unlocked = false;
+          paymentReason = "receipt_already_used";
+        }
 
         const savings = Number(quote.estimatedSavingsUsd ?? 0);
         const ms = Date.now() - t0;
 
-        if (!valid) {
-          const wallet = process.env.PAYMENT_WALLET_ADDRESS ?? "0x0000000000000000000000000000000000000000";
-          const instructions = {
-            scheme: "x402",
-            version: 1,
-            unlock_fee: `${UNLOCK_FEE_USDC} USDC`,
-            networks: [
-              { chain: "base", chainId: 8453, asset: "USDC", assetAddress: USDC_BASE, payTo: wallet, amount: UNLOCK_FEE_USDC },
-              { chain: "ethereum", chainId: 1, asset: "USDC", assetAddress: USDC_ETH, payTo: wallet, amount: UNLOCK_FEE_USDC },
-            ],
-            instructions:
-              "Send the unlock fee to the payTo address, then resend your request including header `X-Payment-Receipt: <tx-hash>`.",
-          };
-          const receiptStatus = logResult.duplicateReceipt
-            ? "already_used"
-            : receipt
-              ? verification.status
-              : "missing";
+        if (!unlocked) {
           const preview = {
-            status: "payment_required",
-            unlock_fee_usd: UNLOCK_FEE_USD_NUM,
-            unlock_fee: `${UNLOCK_FEE_USDC} USDC`,
             estimated_savings_usd: Number(savings.toFixed(4)),
-            reason: savings > UNLOCK_FEE_USD_NUM ? "Savings exceed unlock fee" : "Savings below unlock fee",
             price_impact_pct: quote.priceImpactPct,
             top_source: quote.sources?.[0]?.name ?? null,
-            receipt_status: receiptStatus,
-            receipt_error: logResult.duplicateReceipt
-              ? "Receipt already consumed by a previous request"
-              : verification.error ?? null,
-            request_id: requestId,
-            payment: instructions,
+            unlock_fee_usd: UNLOCK_FEE_DOLLARS,
+            reason:
+              savings > UNLOCK_FEE_DOLLARS ? "Savings exceed unlock fee" : "Savings below unlock fee",
           };
+          const body = payRequiredBody(origin, paymentReason, { preview, request_id: requestId });
           console.log(JSON.stringify({
-            evt: "quote", request_id: requestId, status: 402, chain: chainId,
-            pair: `${sellTok.symbol}/${buyTok.symbol}`, unlocked: false,
-            savings_usd: preview.estimated_savings_usd, receipt_status: preview.receipt_status, ms,
+            evt: "quote", request_id: requestId, status: 402, chain: chainId, mode: paymentMode,
+            pair: `${sellTok.symbol}/${buyTok.symbol}`, unlocked: false, savings_usd: preview.estimated_savings_usd, ms,
           }));
-          return Response.json(preview, {
+          return Response.json(body, {
             status: 402,
             headers: {
               ...baseHeaders,
               "x-payment-required": "true",
-              "x-payment-instructions": JSON.stringify(instructions),
             },
           });
         }
 
-        const rawAny = quote.raw as any;
+        // Settle x402 payment AFTER successful work (per x402 spec).
+        if (paymentMode === "x402" && xPaymentHeader) {
+          try {
+            const decoded = tryDecodePayment(xPaymentHeader)!;
+            const settled = await settleWithCdp(decoded, requirements);
+            // Encode settle result for X-PAYMENT-RESPONSE (base64 JSON per spec)
+            settleResponseHeader = btoa(JSON.stringify({
+              success: settled.success,
+              transaction: settled.transaction,
+              network: settled.network,
+              payer: settled.payer,
+            }));
+          } catch (e) {
+            // If settlement fails, surface it but still return the quote (caller already verified).
+            console.log(JSON.stringify({ evt: "settle_failed", request_id: requestId, error: e instanceof Error ? e.message : "unknown" }));
+          }
+        }
+
+        const rawAny = quote.raw as { fees?: { integratorFee?: { amount?: string; token?: string } } } | null;
         const integratorFee = rawAny?.fees?.integratorFee ?? null;
         const affiliateFee = integratorFee
           ? {
@@ -180,7 +221,7 @@ export const Route = createFileRoute("/api/v1/quote")({
           : null;
 
         console.log(JSON.stringify({
-          evt: "quote", request_id: requestId, status: 200, chain: chainId,
+          evt: "quote", request_id: requestId, status: 200, chain: chainId, mode: paymentMode,
           pair: `${sellTok.symbol}/${buyTok.symbol}`, unlocked: true, savings_usd: savings, ms,
         }));
 
@@ -202,7 +243,13 @@ export const Route = createFileRoute("/api/v1/quote")({
             affiliateFee,
             raw: quote.raw,
           },
-          { status: 200, headers: baseHeaders },
+          {
+            status: 200,
+            headers: {
+              ...baseHeaders,
+              ...(settleResponseHeader ? { [X_PAYMENT_RESPONSE]: settleResponseHeader } : {}),
+            },
+          },
         );
       },
     },

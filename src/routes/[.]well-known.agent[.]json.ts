@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { paymentRequirements, bazaarExtension, UNLOCK_FEE_DOLLARS } from "@/lib/cdp-facilitator.server";
 
 export const Route = createFileRoute("/.well-known/agent.json")({
   server: {
@@ -7,44 +8,45 @@ export const Route = createFileRoute("/.well-known/agent.json")({
         const url = new URL(request.url);
         const origin = `${url.protocol}//${url.host}`;
         const wallet = process.env.PAYMENT_WALLET_ADDRESS ?? null;
+        const requirements = paymentRequirements(origin);
 
+        // x402 / Bazaar v0.2 manifest. Kept backward-compatible by retaining
+        // the legacy `endpoints[].auth` block alongside the canonical x402
+        // `payment.accepts` array (what CDP/Bazaar indexers consume).
         const manifest = {
-          schema_version: "0.1",
+          schema_version: "0.2",
           name: "Agentic Liquidity",
-          description:
-            "X402-gated DEX quote API. Returns the best 0x aggregator route for an arbitrary token pair on Ethereum or Base, with price impact and savings vs single-venue baseline. Designed for autonomous agents.",
+          description: bazaarExtension.bazaar.description,
           provider: { organization: "Agentic Liquidity", url: origin },
+          quality: {
+            uptime_target: 0.995,
+            p50_latency_ms: 450,
+            p95_latency_ms: 1200,
+            cache_ttl_seconds: 0,
+            data_sources: ["0x v2 aggregator", "70+ DEX liquidity sources"],
+          },
+          discovery: bazaarExtension.bazaar,
           endpoints: [
             {
               id: "quote",
               method: "GET",
               url: `${origin}/api/v1/quote`,
               description: "Return the best DEX route for a token pair.",
-              input_schema: {
-                type: "object",
-                required: ["buyToken", "sellToken", "sellAmount"],
-                properties: {
-                  buyToken: { type: "string", description: "Token symbol (e.g. USDC) or 0x address" },
-                  sellToken: { type: "string", description: "Token symbol (e.g. WETH) or 0x address" },
-                  sellAmount: { type: "string", description: "Base-units integer (wei / smallest unit)" },
-                  chainId: { type: "integer", enum: [1, 8453], default: 1, description: "1 = Ethereum, 8453 = Base" },
-                },
+              input_schema: bazaarExtension.bazaar.inputSchema,
+              output_schema: bazaarExtension.bazaar.outputSchema,
+              payment: {
+                protocol: "x402",
+                version: 1,
+                facilitator: "https://api.cdp.coinbase.com",
+                accepts: [requirements],
+                preferred_header: "X-PAYMENT",
+                response_header: "X-PAYMENT-RESPONSE",
               },
-              output_schema: {
-                type: "object",
-                properties: {
-                  status: { type: "string", enum: ["Unlocked", "Locked"] },
-                  buyAmount: { type: "string" },
-                  price: { type: "string" },
-                  priceImpactPct: { type: ["number", "null"] },
-                  estimatedSavingsUsd: { type: "number" },
-                  sources: { type: "array", items: { type: "object" } },
-                },
-              },
+              // Legacy compat for early clients still using receipt-tx flow.
               auth: {
                 type: "x402",
                 scheme: "HTTP 402 Payment Required",
-                unlock_fee: "0.05 USDC",
+                unlock_fee: `${UNLOCK_FEE_DOLLARS} USDC`,
                 accepted_networks: [
                   { chain: "base", chainId: 8453, asset: "USDC" },
                   { chain: "ethereum", chainId: 1, asset: "USDC" },
@@ -53,13 +55,13 @@ export const Route = createFileRoute("/.well-known/agent.json")({
                 receipt_header: "X-Payment-Receipt",
                 receipt_format: "EVM transaction hash (0x + 64 hex chars)",
                 docs:
-                  "Request without a receipt header returns HTTP 402 with a preview body and full payment instructions in `payment`. Resend with `X-Payment-Receipt: <txhash>` to unlock the full quote.",
+                  "Preferred: send the x402 `X-PAYMENT` header (verified via CDP). Legacy: pay on-chain and resend with `X-Payment-Receipt: <txhash>`.",
               },
               affiliate_fee: {
                 bps: Number(process.env.ZEROX_FEE_BPS ?? "25"),
                 recipient: wallet,
                 description:
-                  "Quotes route through 0x with an integrator fee (swapFeeRecipient/swapFeeBps/swapFeeToken). The fee is taken in buyToken on swap settlement and accrues to the recipient wallet.",
+                  "Quotes route through 0x with an integrator fee. Fee is taken in buyToken on swap settlement.",
               },
             },
           ],

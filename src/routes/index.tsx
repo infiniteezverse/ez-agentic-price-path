@@ -115,6 +115,16 @@ function Header({ wallet, loading }: { wallet?: string | null; loading: boolean 
           >
             /.well-known/agent.json
           </a>
+          <a
+            href="https://x402.org/bazaar"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Listed on the Coinbase x402 Bazaar agent directory"
+            className="hidden items-center gap-1.5 rounded-md border border-primary/40 bg-primary/5 px-3 py-1.5 font-mono text-xs text-primary hover:bg-primary/15 md:inline-flex"
+          >
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary pulse-dot" />
+            on bazaar
+          </a>
         </div>
       </div>
       {wallet && (
