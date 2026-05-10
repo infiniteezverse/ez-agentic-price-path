@@ -114,7 +114,7 @@ export const Route = createFileRoute("/api/v1/quote")({
               } else {
                 unlocked = true;
                 logReceipt = verifyResult.payer ?? null;
-                logVerification = { ok: true, status: "x402_verified" };
+                logVerification = { ok: true, status: "verified", payer: verifyResult.payer ?? null } as unknown as VerifyResult;
               }
             } catch (e) {
               paymentReason = e instanceof Error ? e.message : "verify_error";
