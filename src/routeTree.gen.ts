@@ -10,12 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiMcpRouteImport } from './routes/api/mcp'
 import { Route as DotwellKnownAgentDotjsonRouteImport } from './routes/[.]well-known.agent[.]json'
 import { Route as ApiV1QuoteRouteImport } from './routes/api/v1/quote'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMcpRoute = ApiMcpRouteImport.update({
+  id: '/api/mcp',
+  path: '/api/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DotwellKnownAgentDotjsonRoute =
@@ -33,30 +39,39 @@ const ApiV1QuoteRoute = ApiV1QuoteRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/.well-known/agent.json': typeof DotwellKnownAgentDotjsonRoute
+  '/api/mcp': typeof ApiMcpRoute
   '/api/v1/quote': typeof ApiV1QuoteRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/.well-known/agent.json': typeof DotwellKnownAgentDotjsonRoute
+  '/api/mcp': typeof ApiMcpRoute
   '/api/v1/quote': typeof ApiV1QuoteRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/.well-known/agent.json': typeof DotwellKnownAgentDotjsonRoute
+  '/api/mcp': typeof ApiMcpRoute
   '/api/v1/quote': typeof ApiV1QuoteRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/.well-known/agent.json' | '/api/v1/quote'
+  fullPaths: '/' | '/.well-known/agent.json' | '/api/mcp' | '/api/v1/quote'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/.well-known/agent.json' | '/api/v1/quote'
-  id: '__root__' | '/' | '/.well-known/agent.json' | '/api/v1/quote'
+  to: '/' | '/.well-known/agent.json' | '/api/mcp' | '/api/v1/quote'
+  id:
+    | '__root__'
+    | '/'
+    | '/.well-known/agent.json'
+    | '/api/mcp'
+    | '/api/v1/quote'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DotwellKnownAgentDotjsonRoute: typeof DotwellKnownAgentDotjsonRoute
+  ApiMcpRoute: typeof ApiMcpRoute
   ApiV1QuoteRoute: typeof ApiV1QuoteRoute
 }
 
@@ -67,6 +82,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/mcp': {
+      id: '/api/mcp'
+      path: '/api/mcp'
+      fullPath: '/api/mcp'
+      preLoaderRoute: typeof ApiMcpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/.well-known/agent.json': {
@@ -89,18 +111,9 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DotwellKnownAgentDotjsonRoute: DotwellKnownAgentDotjsonRoute,
+  ApiMcpRoute: ApiMcpRoute,
   ApiV1QuoteRoute: ApiV1QuoteRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
