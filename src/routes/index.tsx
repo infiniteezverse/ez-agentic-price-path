@@ -37,7 +37,10 @@ function Dashboard() {
   });
 
   // Live toll feed (synthetic — represents real X402 micropayments hitting the API)
-  const [feed, setFeed] = useState<FeedItem[]>(() => seedFeed());
+  const [feed, setFeed] = useState<FeedItem[]>([]);
+  useEffect(() => {
+    setFeed(seedFeed());
+  }, []);
   useEffect(() => {
     const id = setInterval(() => {
       setFeed((prev) => [
