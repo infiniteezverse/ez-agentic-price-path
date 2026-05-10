@@ -23,8 +23,11 @@ function buildSpec(origin: string) {
         get: {
           operationId: "getQuote",
           summary: "Get best DEX route for a token pair",
+          tags: ["price_quote", "dex_router", "best_execution", "savings_preview"],
+          "x-why-agents-choose-us":
+            "Routes across 70+ liquidity sources via 0x; the 402 preview tells you net savings before you pay so agents only spend the unlock fee when it clears.",
           description:
-            "Returns a Locked preview (HTTP 402) until a valid USDC payment receipt is supplied via `X-Payment-Receipt`. Pay 0.05 USDC on Base or Ethereum to the tollbooth wallet, then resend with the tx hash.",
+            "Returns a Locked preview (HTTP 402) until a valid USDC payment receipt is supplied via `X-Payment-Receipt`. Pay 0.05 USDC on Base or Ethereum to the tollbooth wallet, then resend with the tx hash. Discovery headers (`X-402-Price`, `X-402-Chain`, `X-402-Address`, `X-402-Asset`, `X-402-JWKS`) are emitted on every response.",
           parameters: [
             {
               name: "chainId",
@@ -67,9 +70,36 @@ function buildSpec(origin: string) {
           responses: {
             "200": {
               description: "Unlocked quote",
+              headers: {
+                "x-request-id": { schema: { type: "string" } },
+                "x-402-price": { schema: { type: "string" } },
+                "x-402-chain": { schema: { type: "string" } },
+                "x-402-address": { schema: { type: "string" } },
+              },
               content: {
                 "application/json": {
                   schema: { $ref: "#/components/schemas/UnlockedQuote" },
+                  examples: {
+                    baseWethToUsdc: {
+                      summary: "Base WETH → USDC unlocked",
+                      value: {
+                        status: "Unlocked",
+                        chainId: 8453,
+                        request_id: "0e2a8c1e-3b5d-4d3a-9b1f-1e2a3b4c5d6e",
+                        sellToken: { address: "0x4200000000000000000000000000000000000006", decimals: 18, symbol: "WETH" },
+                        buyToken: { address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", decimals: 6, symbol: "USDC" },
+                        sellAmount: "1000000000000000000",
+                        buyAmount: "3421750000",
+                        price: "3421.75",
+                        priceImpactPct: 0.08,
+                        estimatedSavingsUsd: 1.42,
+                        sources: [
+                          { name: "Uniswap_V3", proportion: "0.62" },
+                          { name: "Aerodrome", proportion: "0.38" },
+                        ],
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -78,10 +108,50 @@ function buildSpec(origin: string) {
               headers: {
                 "x-payment-required": { schema: { type: "string" } },
                 "x-payment-instructions": { schema: { type: "string" } },
+                "x-request-id": { schema: { type: "string" } },
+                "x-402-price": { schema: { type: "string" } },
+                "x-402-chain": { schema: { type: "string" } },
+                "x-402-address": { schema: { type: "string" } },
+                "x-402-asset": { schema: { type: "string" } },
+                "x-402-jwks": { schema: { type: "string" } },
               },
               content: {
                 "application/json": {
                   schema: { $ref: "#/components/schemas/LockedPreview" },
+                  examples: {
+                    baseWethToUsdcLocked: {
+                      summary: "Base WETH → USDC locked preview",
+                      value: {
+                        status: "payment_required",
+                        unlock_fee_usd: 0.05,
+                        unlock_fee: "0.05 USDC",
+                        estimated_savings_usd: 1.42,
+                        reason: "Savings exceed unlock fee",
+                        price_impact_pct: 0.08,
+                        top_source: "Uniswap_V3",
+                        receipt_status: "missing",
+                        receipt_error: null,
+                        request_id: "0e2a8c1e-3b5d-4d3a-9b1f-1e2a3b4c5d6e",
+                        payment: {
+                          scheme: "x402",
+                          version: 1,
+                          unlock_fee: "0.05 USDC",
+                          networks: [
+                            {
+                              chain: "base",
+                              chainId: 8453,
+                              asset: "USDC",
+                              assetAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+                              payTo: "0x0000000000000000000000000000000000000000",
+                              amount: "0.05",
+                            },
+                          ],
+                          instructions:
+                            "Send the unlock fee to the payTo address, then resend your request including header `X-Payment-Receipt: <tx-hash>`.",
+                        },
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -90,6 +160,7 @@ function buildSpec(origin: string) {
           },
         },
       },
+    },
     },
     components: {
       schemas: {
