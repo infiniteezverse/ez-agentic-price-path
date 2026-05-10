@@ -38,7 +38,8 @@ export async function logQuoteCall(input: LogQuoteCallInput): Promise<void> {
       verification_error: input.verification.error ?? null,
       client_ip_hash: hashIp(input.ip),
       user_agent: input.userAgent?.slice(0, 200) ?? null,
-    });
+      request_id: input.requestId ?? null,
+    } as never);
   } catch (e) {
     // Never block the API on logging failures
     console.error("[quote-log] insert failed:", e);
