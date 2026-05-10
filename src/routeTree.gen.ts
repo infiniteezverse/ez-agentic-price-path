@@ -9,12 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PlaygroundRouteImport } from './routes/playground'
 import { Route as OpenapiDotjsonRouteImport } from './routes/openapi[.]json'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiMcpRouteImport } from './routes/api/mcp'
 import { Route as DotwellKnownAgentDotjsonRouteImport } from './routes/[.]well-known.agent[.]json'
 import { Route as ApiV1QuoteRouteImport } from './routes/api/v1/quote'
 
+const PlaygroundRoute = PlaygroundRouteImport.update({
+  id: '/playground',
+  path: '/playground',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OpenapiDotjsonRoute = OpenapiDotjsonRouteImport.update({
   id: '/openapi.json',
   path: '/openapi.json',
@@ -45,6 +51,7 @@ const ApiV1QuoteRoute = ApiV1QuoteRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/openapi.json': typeof OpenapiDotjsonRoute
+  '/playground': typeof PlaygroundRoute
   '/.well-known/agent.json': typeof DotwellKnownAgentDotjsonRoute
   '/api/mcp': typeof ApiMcpRoute
   '/api/v1/quote': typeof ApiV1QuoteRoute
@@ -52,6 +59,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/openapi.json': typeof OpenapiDotjsonRoute
+  '/playground': typeof PlaygroundRoute
   '/.well-known/agent.json': typeof DotwellKnownAgentDotjsonRoute
   '/api/mcp': typeof ApiMcpRoute
   '/api/v1/quote': typeof ApiV1QuoteRoute
@@ -60,6 +68,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/openapi.json': typeof OpenapiDotjsonRoute
+  '/playground': typeof PlaygroundRoute
   '/.well-known/agent.json': typeof DotwellKnownAgentDotjsonRoute
   '/api/mcp': typeof ApiMcpRoute
   '/api/v1/quote': typeof ApiV1QuoteRoute
@@ -69,6 +78,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/openapi.json'
+    | '/playground'
     | '/.well-known/agent.json'
     | '/api/mcp'
     | '/api/v1/quote'
@@ -76,6 +86,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/openapi.json'
+    | '/playground'
     | '/.well-known/agent.json'
     | '/api/mcp'
     | '/api/v1/quote'
@@ -83,6 +94,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/openapi.json'
+    | '/playground'
     | '/.well-known/agent.json'
     | '/api/mcp'
     | '/api/v1/quote'
@@ -91,6 +103,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   OpenapiDotjsonRoute: typeof OpenapiDotjsonRoute
+  PlaygroundRoute: typeof PlaygroundRoute
   DotwellKnownAgentDotjsonRoute: typeof DotwellKnownAgentDotjsonRoute
   ApiMcpRoute: typeof ApiMcpRoute
   ApiV1QuoteRoute: typeof ApiV1QuoteRoute
@@ -98,6 +111,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/playground': {
+      id: '/playground'
+      path: '/playground'
+      fullPath: '/playground'
+      preLoaderRoute: typeof PlaygroundRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/openapi.json': {
       id: '/openapi.json'
       path: '/openapi.json'
@@ -139,6 +159,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   OpenapiDotjsonRoute: OpenapiDotjsonRoute,
+  PlaygroundRoute: PlaygroundRoute,
   DotwellKnownAgentDotjsonRoute: DotwellKnownAgentDotjsonRoute,
   ApiMcpRoute: ApiMcpRoute,
   ApiV1QuoteRoute: ApiV1QuoteRoute,
