@@ -161,7 +161,6 @@ function buildSpec(origin: string) {
         },
       },
     },
-    },
     components: {
       schemas: {
         Token: {
