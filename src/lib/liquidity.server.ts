@@ -52,35 +52,28 @@ export async function fetch0xQuote(params: {
   sellAmount: string;
 }): Promise<QuoteResult> {
   const apiKey = process.env.ZEROX_API_KEY;
-  const base = ZEROX_BASE[params.chainId];
-  if (!base) throw new Error(`Unsupported chainId ${params.chainId}`);
+  if (![1, 8453].includes(params.chainId)) {
+    throw new Error(`Unsupported chainId ${params.chainId}`);
+  }
 
-  // Try v2 swap/permit2 endpoint first (current 0x API)
-  const url = new URL(`${base}/swap/permit2/quote`);
+  // Use the indicative `price` endpoint — does not require a real taker address
+  // and is the right choice for read-only quotes / dashboard previews.
+  const url = new URL(`${ZEROX_HOST}/swap/permit2/price`);
   url.searchParams.set("chainId", String(params.chainId));
   url.searchParams.set("buyToken", params.buyToken);
   url.searchParams.set("sellToken", params.sellToken);
   url.searchParams.set("sellAmount", params.sellAmount);
-  url.searchParams.set("taker", "0x0000000000000000000000000000000000000000");
 
-  let res = await fetch(url, {
-    headers: apiKey
-      ? { "0x-api-key": apiKey, "0x-version": "v2" }
-      : { "0x-version": "v2" },
-  });
+  const headers: Record<string, string> = { "0x-version": "v2" };
+  if (apiKey) headers["0x-api-key"] = apiKey;
 
-  // Fallback to legacy v1 if v2 fails
-  if (!res.ok) {
-    const legacy = new URL(`${base}/swap/v1/quote`);
-    legacy.searchParams.set("buyToken", params.buyToken);
-    legacy.searchParams.set("sellToken", params.sellToken);
-    legacy.searchParams.set("sellAmount", params.sellAmount);
-    res = await fetch(legacy, { headers: apiKey ? { "0x-api-key": apiKey } : {} });
-  }
+  const res = await fetch(url, { headers });
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`0x API error [${res.status}]: ${text.slice(0, 200)}`);
+    const reqId = res.headers.get("x-request-id") ?? "";
+    console.error(`[0x] ${res.status} on ${url.pathname} reqId=${reqId} body=${text.slice(0, 300)}`);
+    throw new Error(`0x API error [${res.status}]${reqId ? ` reqId=${reqId}` : ""}: ${text.slice(0, 200)}`);
   }
 
   const data: any = await res.json();
