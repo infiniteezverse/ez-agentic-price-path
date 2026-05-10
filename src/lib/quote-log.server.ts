@@ -16,14 +16,19 @@ export type LogQuoteCallInput = {
   requestId?: string | null;
 };
 
+export type LogQuoteCallResult = {
+  inserted: boolean;
+  duplicateReceipt: boolean;
+};
+
 function hashIp(ip?: string | null): string | null {
   if (!ip) return null;
   return createHash("sha256").update(ip).digest("hex").slice(0, 16);
 }
 
-export async function logQuoteCall(input: LogQuoteCallInput): Promise<void> {
+export async function logQuoteCall(input: LogQuoteCallInput): Promise<LogQuoteCallResult> {
   try {
-    await supabaseAdmin.from("quote_calls").insert({
+    const { error } = await supabaseAdmin.from("quote_calls").insert({
       chain_id: input.chainId,
       sell_token: input.sellSymbol,
       buy_token: input.buySymbol,
@@ -40,8 +45,18 @@ export async function logQuoteCall(input: LogQuoteCallInput): Promise<void> {
       user_agent: input.userAgent?.slice(0, 200) ?? null,
       request_id: input.requestId ?? null,
     } as never);
+    if (error) {
+      // Postgres unique violation -> receipt already consumed for an unlocked row.
+      const code = (error as { code?: string }).code;
+      if (code === "23505") {
+        return { inserted: false, duplicateReceipt: true };
+      }
+      console.error("[quote-log] insert failed:", error);
+      return { inserted: false, duplicateReceipt: false };
+    }
+    return { inserted: true, duplicateReceipt: false };
   } catch (e) {
-    // Never block the API on logging failures
-    console.error("[quote-log] insert failed:", e);
+    console.error("[quote-log] insert threw:", e);
+    return { inserted: false, duplicateReceipt: false };
   }
 }
