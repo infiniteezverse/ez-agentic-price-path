@@ -99,7 +99,7 @@ export const Route = createFileRoute("/api/v1/quote")({
         let paymentMode: "x402" | "legacy" | "none" = "none";
         let paymentReason = "missing";
         let logReceipt: string | null = null;
-        let logVerification: { ok: boolean; status: string; error?: string | null } = { ok: false, status: "missing" };
+        let logVerification: VerifyResult = { ok: false, status: "missing" } as unknown as VerifyResult;
 
         if (xPaymentHeader) {
           paymentMode = "x402";
