@@ -1,24 +1,64 @@
 ## Goal
-Replace the misconfigured `PAYMENT_WALLET_ADDRESS` (currently the USDC token contract address) with your real receiving wallet `0x13dDE704389b1118B20d2BCc6D3Ace749600e2ad`.
 
-## Steps
+Make the API trivially try-able by humans and auto-importable by agent frameworks (LangChain, LlamaIndex, CrewAI, OpenAI tools).
 
-1. **Update the secret** via `secrets--update_secret` for `PAYMENT_WALLET_ADDRESS`. You'll be prompted to paste the new value:
-   ```
-   0x13dDE704389b1118B20d2BCc6D3Ace749600e2ad
-   ```
-   This wallet receives:
-   - X402 unlock fees (0.05 USDC per request) sent directly by callers
-   - 0x affiliate fees (25 bps) on every executed swap, via `swapFeeRecipient`
+## Deliverables
 
-2. **Verify propagation** (no code change needed — already wired through env):
-   - `GET /.well-known/agent.json` → `auth.pay_to` and `affiliate_fee.recipient` should show the new address
-   - `GET /api/v1/quote?...` (no receipt) → `payment.networks[].payTo` should show the new address
-   - Top Routes panel still loads (sanity check)
+### 1. `/openapi.json` — OpenAPI 3.1 spec
 
-3. **Republish** so the production URL `toll-bright-insight.lovable.app` serves the new wallet.
+New server route `src/routes/openapi[.]json.ts` returning a static JSON document describing `GET /api/v1/quote`.
 
-## Notes
-- No code edits required — `PAYMENT_WALLET_ADDRESS` is read at request time in `src/lib/liquidity.server.ts`, `src/routes/api/v1/quote.ts`, and `src/routes/[.]well-known.agent[.]json.ts`.
-- The address passes the `^0x[a-fA-F0-9]{40}$` regex used by the affiliate-fee gate, so 0x calls will continue to include the fee triplet.
-- Old payments to the previous address (the USDC contract) are unrecoverable; nothing to migrate.
+Includes:
+- `info`: title "Agentic Liquidity API", version, description, contact
+- `servers`: published URL
+- One path `/api/v1/quote` with query params (`chainId`, `sellToken`, `buyToken`, `sellAmount`) and header `X-Payment-Receipt`
+- Two response schemas: `200 Unlocked` and `402 Locked` (with payment instructions)
+- Reusable components: `Token`, `Source`, `PaymentInstructions`, `UnlockedQuote`, `LockedPreview`
+- `x-mcp-server`: `/api/mcp` extension hint
+- CORS headers so browser-based importers can fetch it
+
+### 2. `/playground` — interactive try-it page
+
+New route `src/routes/playground.tsx`. Single-page form, no auth, calls our own `/api/v1/quote`.
+
+Layout (uses existing design tokens, shadcn `Card`, `Input`, `Select`, `Button`, `Tabs`):
+
+```text
+┌─────────────────────────────────────────────┐
+│ Playground                                  │
+│ Try the quote endpoint live. No signup.     │
+├──────────────────┬──────────────────────────┤
+│ Chain  [Base ▾]  │ Response (live)          │
+│ Sell   [WETH ▾]  │ ┌──────────────────────┐ │
+│ Buy    [USDC ▾]  │ │ {                    │ │
+│ Amount [1.0    ] │ │   "status":"Locked", │ │
+│ Receipt[0x... ] │ │   ...                │ │
+│ [ Get Quote → ]  │ └──────────────────────┘ │
+│                  │                          │
+│ Snippets:        │ Status: 402 • 412 ms     │
+│ [curl][TS][Py]   │                          │
+└──────────────────┴──────────────────────────┘
+```
+
+Behaviour:
+- Token symbol presets per chain (ETH/WETH/USDC/USDT/DAI/WBTC); amount input auto-converts to base units using known decimals
+- "Get Quote" hits `/api/v1/quote` from the browser; pretty-prints JSON, shows status code + latency
+- Receipt field optional; populated → adds `X-Payment-Receipt` header
+- Three copy-to-clipboard snippet tabs (`curl`, `TypeScript fetch`, `Python requests`) regenerate from the current form
+- Footer links: `OpenAPI spec → /openapi.json`, `MCP server → /api/mcp`, `Agent card → /.well-known/agent.json`
+
+### 3. Landing page hookup
+
+In `src/routes/index.tsx`, add two small links/buttons in the hero or developer section: "Try in Playground" → `/playground`, "OpenAPI" → `/openapi.json`. No other changes.
+
+## Out of scope
+
+- No DB writes from the playground beyond what `/api/v1/quote` already logs
+- No new auth, no rate-limiting changes
+- No edits to MCP, receipt verification, or quote logic
+
+## Files
+
+- create `src/routes/openapi[.]json.ts`
+- create `src/routes/playground.tsx`
+- edit  `src/routes/index.tsx` (two links only)
