@@ -111,6 +111,17 @@ export const Route = createFileRoute("/api/v1/quote")({
           });
         }
 
+        const rawAny = quote.raw as any;
+        const integratorFee = rawAny?.fees?.integratorFee ?? null;
+        const affiliateFee = integratorFee
+          ? {
+              recipient: process.env.PAYMENT_WALLET_ADDRESS ?? null,
+              bps: Number(process.env.ZEROX_FEE_BPS ?? "25"),
+              amount: integratorFee.amount ?? null,
+              token: integratorFee.token ?? null,
+            }
+          : null;
+
         return Response.json(
           {
             status: "Unlocked",
@@ -125,6 +136,7 @@ export const Route = createFileRoute("/api/v1/quote")({
             priceImpactPct: quote.priceImpactPct,
             estimatedSavingsUsd: quote.estimatedSavingsUsd,
             sources: quote.sources,
+            affiliateFee,
             raw: quote.raw,
           },
           { status: 200, headers: corsHeaders() },
