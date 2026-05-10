@@ -117,6 +117,8 @@ export const Route = createFileRoute("/api/v1/quote")({
             top_source: quote.sources?.[0]?.name ?? null,
             status: "Locked",
             unlock_fee: `${UNLOCK_FEE_USDC} USDC`,
+            receipt_status: receipt ? verification.status : "missing",
+            receipt_error: verification.error ?? null,
             payment: instructions,
           };
           return Response.json(preview, {
