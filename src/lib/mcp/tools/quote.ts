@@ -47,24 +47,32 @@ export const quoteTool = defineTool({
     });
 
     const verification = await verifyOnChainReceipt(receipt ?? null);
-    const unlocked = verification.ok;
 
-    await logQuoteCall({
+    const logResult = await logQuoteCall({
       chainId,
       sellSymbol: sellTok.symbol,
       buySymbol: buyTok.symbol,
       sellAmount,
       receipt: receipt ?? null,
       verification,
-      unlocked,
+      unlocked: verification.ok,
     });
 
+    const unlocked = verification.ok && !logResult.duplicateReceipt;
+
     if (!unlocked) {
+      const receiptStatus = logResult.duplicateReceipt
+        ? "already_used"
+        : receipt
+          ? verification.status
+          : "missing";
       return json({
         status: "Locked",
         unlock_fee: "0.05 USDC",
-        receipt_status: receipt ? verification.status : "missing",
-        receipt_error: verification.error ?? null,
+        receipt_status: receiptStatus,
+        receipt_error: logResult.duplicateReceipt
+          ? "Receipt already consumed by a previous request"
+          : verification.error ?? null,
         preview: {
           estimatedSavingsUsd: quote.estimatedSavingsUsd,
           priceImpactPct: quote.priceImpactPct,
