@@ -87,7 +87,7 @@ export function paymentRequirements(origin: string): PaymentRequirements {
   } as PaymentRequirements;
 }
 
-const { verify, settle } = useFacilitator(facilitator);
+const { verify, settle } = useFacilitator(facilitator as never);
 
 export type DecodedPayment = PaymentPayload;
 
