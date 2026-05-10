@@ -9,11 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as OpenapiDotjsonRouteImport } from './routes/openapi[.]json'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiMcpRouteImport } from './routes/api/mcp'
 import { Route as DotwellKnownAgentDotjsonRouteImport } from './routes/[.]well-known.agent[.]json'
 import { Route as ApiV1QuoteRouteImport } from './routes/api/v1/quote'
 
+const OpenapiDotjsonRoute = OpenapiDotjsonRouteImport.update({
+  id: '/openapi.json',
+  path: '/openapi.json',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -38,12 +44,14 @@ const ApiV1QuoteRoute = ApiV1QuoteRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/openapi.json': typeof OpenapiDotjsonRoute
   '/.well-known/agent.json': typeof DotwellKnownAgentDotjsonRoute
   '/api/mcp': typeof ApiMcpRoute
   '/api/v1/quote': typeof ApiV1QuoteRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/openapi.json': typeof OpenapiDotjsonRoute
   '/.well-known/agent.json': typeof DotwellKnownAgentDotjsonRoute
   '/api/mcp': typeof ApiMcpRoute
   '/api/v1/quote': typeof ApiV1QuoteRoute
@@ -51,18 +59,30 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/openapi.json': typeof OpenapiDotjsonRoute
   '/.well-known/agent.json': typeof DotwellKnownAgentDotjsonRoute
   '/api/mcp': typeof ApiMcpRoute
   '/api/v1/quote': typeof ApiV1QuoteRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/.well-known/agent.json' | '/api/mcp' | '/api/v1/quote'
+  fullPaths:
+    | '/'
+    | '/openapi.json'
+    | '/.well-known/agent.json'
+    | '/api/mcp'
+    | '/api/v1/quote'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/.well-known/agent.json' | '/api/mcp' | '/api/v1/quote'
+  to:
+    | '/'
+    | '/openapi.json'
+    | '/.well-known/agent.json'
+    | '/api/mcp'
+    | '/api/v1/quote'
   id:
     | '__root__'
     | '/'
+    | '/openapi.json'
     | '/.well-known/agent.json'
     | '/api/mcp'
     | '/api/v1/quote'
@@ -70,6 +90,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  OpenapiDotjsonRoute: typeof OpenapiDotjsonRoute
   DotwellKnownAgentDotjsonRoute: typeof DotwellKnownAgentDotjsonRoute
   ApiMcpRoute: typeof ApiMcpRoute
   ApiV1QuoteRoute: typeof ApiV1QuoteRoute
@@ -77,6 +98,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/openapi.json': {
+      id: '/openapi.json'
+      path: '/openapi.json'
+      fullPath: '/openapi.json'
+      preLoaderRoute: typeof OpenapiDotjsonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -110,6 +138,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  OpenapiDotjsonRoute: OpenapiDotjsonRoute,
   DotwellKnownAgentDotjsonRoute: DotwellKnownAgentDotjsonRoute,
   ApiMcpRoute: ApiMcpRoute,
   ApiV1QuoteRoute: ApiV1QuoteRoute,
@@ -117,3 +146,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
