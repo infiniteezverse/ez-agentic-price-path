@@ -47,7 +47,7 @@ export const quoteTool = defineTool({
     const unlocked = !!receipt && /^0x[a-fA-F0-9]{64}$/.test(receipt);
 
     if (!unlocked) {
-      return {
+      return json({
         status: "Locked",
         unlock_fee: "0.05 USDC",
         preview: {
@@ -63,10 +63,10 @@ export const quoteTool = defineTool({
           ],
           instructions: "Send 0.05 USDC to payTo on Base or Ethereum, then re-call this tool with `receipt` set to the transaction hash.",
         },
-      };
+      });
     }
 
-    return {
+    return json({
       status: "Unlocked",
       chainId,
       sellToken: sellTok,
@@ -80,6 +80,6 @@ export const quoteTool = defineTool({
       estimatedSavingsUsd: quote.estimatedSavingsUsd,
       topSource: quote.sources?.[0]?.name ?? null,
       sources: quote.sources?.slice(0, 5) ?? [],
-    };
+    });
   },
 });
