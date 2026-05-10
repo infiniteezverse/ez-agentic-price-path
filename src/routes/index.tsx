@@ -27,7 +27,7 @@ function rowToFeedItem(r: FeedRow): FeedItem {
     chain: r.payment_chain === "ethereum" ? "Ethereum" : "Base",
     pair: r.pair,
     ts: new Date(r.created_at).getTime(),
-    agent: r.payer_address ? `${r.payer_address.slice(0, 6)}…${r.payer_address.slice(-4)}` : "anon",
+    agent: r.payer_short ?? "anon",
   };
 }
 

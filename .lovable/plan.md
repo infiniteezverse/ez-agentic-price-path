@@ -1,95 +1,48 @@
-## Where we are
+## Goal
 
-Already shipped: `/openapi.json`, `/.well-known/agent.json`, `/api/mcp`, `/api/v1/quote` with real on-chain USDC receipt verification, persisted `quote_calls` log + replay-protection unique index, live toll feed on the dashboard, and a `/playground` with curl/TS/Python snippets.
+Lock down `quote_calls` so wallet addresses, IP hashes, user agents, and internal verification fields are no longer exposed via the public anon key, while keeping the public "recent tolls" feed working on the homepage. Also clean up two related findings flagged by the scanner.
 
-The next highest-leverage move is **Bazaar / CDP Facilitator compliance** — small surface area, unlocks distribution. Then docs polish. EIP-3009 gasless and external marketplace submissions come after.
+## Why not "just do it in the Supabase dashboard"
 
-## Next sprint — "Bazaar-ready" (Phase 1.A + 1.C + 2.B finish)
+In this project all schema and policy changes are version-controlled via `supabase/migrations/*.sql`. Editing policies in the dashboard would drift from the repo and get overwritten. The fix below is the same change, done as a migration so it survives deploys.
 
-Goal: a CDP Facilitator / x402 Bazaar crawler can hit our endpoint, read the price/chain/address from headers, fetch JWKS, and see a deterministic savings preview that justifies the unlock fee.
+## Changes
 
-### 1. X-402 discovery headers on `/api/v1/quote`
+### 1. Tighten RLS on `quote_calls` (migration)
 
-Add to **both** the 402 and 200 responses (and the OPTIONS preflight `Access-Control-Expose-Headers`):
+- Drop the existing `Anyone can view quote call log` policy (`USING (true)`).
+- Do **not** add any public `SELECT` policy. With RLS enabled and no policy, the anon key gets zero rows — exactly what we want.
+- Do **not** add a public `INSERT` policy either. The API writes through `supabaseAdmin` (service role), which bypasses RLS, so inserts keep working without exposing a public write surface.
+- Create a safe public view `public.quote_calls_public` exposing only non-sensitive columns: `id, created_at, chain_id, pair, payment_chain, payment_amount_usdc, receipt_tx_hash, unlocked`, plus a masked `payer_short` (e.g. `0x1234…abcd`) derived from `payer_address`. Grant `SELECT` on this view to `anon` and `authenticated`.
 
-```text
-X-402-Price:   0.05 USDC
-X-402-Chain:   base
-X-402-Address: <PAYMENT_WALLET_ADDRESS>
-X-402-JWKS:    <origin>/.well-known/jwks.json
-X-402-Asset:   0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913   # USDC on Base
-```
+This satisfies the `quote_calls_public_exposure` and `quote_calls_full_select` findings.
 
-Edit: `src/routes/api/v1/quote.ts` — extend `corsHeaders()` to take the request origin, add the `X-402-*` set, and append them to every `Response.json(...)` return (402, 200, 400, 502).
+### 2. Repoint the public feed to the safe view
 
-### 2. JWKS endpoint (`/.well-known/jwks.json`)
+- `src/lib/feed.functions.ts`: query `quote_calls_public` instead of `quote_calls`. Update `FeedRow` to drop `payer_address` and add `payer_short`.
+- `src/routes/index.tsx`: render `payer_short` instead of slicing `payer_address` client-side.
 
-Create `src/routes/[.]well-known.jwks[.]json.ts`. For now, serve a valid empty JWK Set:
+### 3. Sanitize upstream 0x error passthrough (`zerox_error_passthrough`)
 
-```json
-{ "keys": [] }
-```
+- `src/lib/liquidity.server.ts`: keep full `console.error` server-side, but `throw new Error("upstream_quote_failed")`.
+- `src/routes/api/v1/quote.ts`: in the 502 branch, return `{ error: "Upstream quote failed" }` only — drop the `message` field.
 
-with `cache-control: public, max-age=300` and CORS `*`. This satisfies the Facilitator's "JWKS reachable" check; we wire real keys when we ship EIP-3009 / signed receipts.
+### 4. Close the receipt-replay TOCTOU race (`receipt_replay_toctou`)
 
-### 3. Deterministic 402 savings field
+- `src/lib/quote-log.server.ts`: change `logQuoteCall` to return `{ inserted: boolean }` and stop swallowing unique-violation errors silently — detect Postgres error code `23505` on `idx_quote_calls_receipt_unique` and return `inserted: false` instead of throwing.
+- `src/routes/api/v1/quote.ts` and `src/lib/mcp/tools/quote.ts`: when a receipt is provided and verification passes, attempt the insert **first**. If `inserted === false` (receipt already consumed), fall through to the 402 path with `receipt_status: "already_used"` instead of returning an unlocked 200.
 
-Today the 402 body returns `estimated_savings_usd` as a **stringified** float nested in a preview blob. Bazaar agents key off a top-level number.
+## Out of scope
 
-Update `/api/v1/quote` 402 body to the canonical shape:
-
-```json
-{
-  "status": "payment_required",
-  "unlock_fee_usd": 0.05,
-  "unlock_fee": "0.05 USDC",
-  "estimated_savings_usd": 1.42,
-  "reason": "Savings exceed unlock fee",
-  "price_impact_pct": 0.12,
-  "top_source": "Uniswap_V3",
-  "receipt_status": "missing",
-  "receipt_error": null,
-  "payment": { /* unchanged x402 instructions */ }
-}
-```
-
-`estimated_savings_usd` becomes a `number`, and `reason` flips to `"Savings below unlock fee"` when it doesn't clear 0.05. Update the matching `LockedPreview` schema in `src/routes/openapi[.]json.ts` to match (number, not string).
-
-### 4. Request-ID correlation + structured logs
-
-- Generate `crypto.randomUUID()` per request in `/api/v1/quote`, return as `X-Request-Id`, store on `quote_calls` (new nullable column `request_id text`).
-- Replace ad-hoc `console.error` with a single `console.log(JSON.stringify({ evt: "quote", request_id, status, chain, pair, unlocked, ms }))` line per call so log scrapers (Axiom/Helicone later) can index it.
-
-Migration: `alter table public.quote_calls add column request_id text;`
-
-### 5. OpenAPI enrichment (Phase 2.A polish)
-
-In `src/routes/openapi[.]json.ts`:
-- Add `tags: ["price_quote","dex_router","best_execution","savings_preview"]` to the `getQuote` operation.
-- Add `examples` blocks under both 200 and 402 response content (one realistic Base WETH→USDC each).
-- Add an `x-why-agents-choose-us` extension on the operation: `"Routes across 70+ liquidity sources via 0x; 402 preview tells you net savings before you pay."`
-- Bump `info.version` to `1.1.0`.
-
-### 6. Out of scope for this sprint (next sprints)
-
-- **EIP-3009 gasless USDC** — separate sprint, needs key management + `transferWithAuthorization` verifier.
-- **Bazaar / agentic.market submission** — do after 1–5 land and we have a published URL with the new headers.
-- **Backend rate limiting** — intentionally skipped; platform has no good primitives yet.
-- **Aerodrome / Uniswap v3 direct integrations, caching, latency monitoring** — current 0x routing already covers this; revisit when volume justifies.
-- **Farcaster bot, leaderboard, free-trial logic** — growth layer, after Curated criteria.
-
-## Files
-
-- edit `src/routes/api/v1/quote.ts` (headers, deterministic 402 body, request-id, structured log)
-- edit `src/routes/openapi[.]json.ts` (schema fix, examples, tags, version)
-- edit `src/lib/quote-log.server.ts` (accept `request_id`)
-- create `src/routes/[.]well-known.jwks[.]json.ts`
-- migration: add `request_id` column to `quote_calls`
+- No changes to auth, JWKS, OpenAPI spec, or x402 headers.
+- No new tables; only one new view.
+- No UI redesign — only the field name/format change in the feed row.
 
 ## Acceptance checks
 
-- `curl -i .../api/v1/quote?...` shows all five `X-402-*` headers on both 402 and 200.
-- `curl .../.well-known/jwks.json` returns `{"keys":[]}` with 200 + CORS.
-- 402 body has top-level numeric `estimated_savings_usd` and `unlock_fee_usd`.
-- `/openapi.json` `LockedPreview.estimated_savings_usd` is `type: number`; operation has `tags` + examples.
-- Each call logs one JSON line including `request_id`, and the same id appears in the response header and `quote_calls.request_id`.
+- `curl https://<project>.supabase.co/rest/v1/quote_calls?select=*` with the anon key returns `[]` (or 401-style empty result), not rows.
+- `curl https://<project>.supabase.co/rest/v1/quote_calls_public?select=*` returns rows with **no** `payer_address`, `client_ip_hash`, `user_agent`, `verification_status`, `verification_error`, or `request_id`.
+- Homepage "recent tolls" feed still renders, showing masked payer (`0x1234…abcd`).
+- `/api/v1/quote` with a bad upstream response returns `{ "error": "Upstream quote failed" }` with no 0x details.
+- Two concurrent `/api/v1/quote` calls sharing one tx hash: exactly one returns 200 unlocked; the other returns 402 with `receipt_status: "already_used"`.
+- Re-running the security scan clears all four current findings.

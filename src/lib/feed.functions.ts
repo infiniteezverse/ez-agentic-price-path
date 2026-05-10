@@ -6,7 +6,7 @@ export type FeedRow = {
   created_at: string;
   chain_id: number;
   pair: string;
-  payer_address: string | null;
+  payer_short: string | null;
   payment_chain: string | null;
   payment_amount_usdc: number | null;
   receipt_tx_hash: string | null;
@@ -15,21 +15,18 @@ export type FeedRow = {
 
 export const getRecentTolls = createServerFn({ method: "GET" }).handler(async () => {
   const { data, error } = await supabaseAdmin
-    .from("quote_calls")
-    .select("id, created_at, chain_id, pair, payer_address, payment_chain, payment_amount_usdc, receipt_tx_hash, unlocked")
-    .eq("unlocked", true)
+    .from("quote_calls_public" as never)
+    .select("id, created_at, chain_id, pair, payer_short, payment_chain, payment_amount_usdc, receipt_tx_hash, unlocked")
     .order("created_at", { ascending: false })
     .limit(20);
   if (error) {
     console.error("[feed] fetch failed:", error);
     return { rows: [] as FeedRow[], total24h: 0 };
   }
-  // Count for last 24h
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { count } = await supabaseAdmin
-    .from("quote_calls")
+    .from("quote_calls_public" as never)
     .select("id", { count: "exact", head: true })
-    .eq("unlocked", true)
     .gte("created_at", since);
-  return { rows: (data ?? []) as FeedRow[], total24h: count ?? 0 };
+  return { rows: ((data ?? []) as unknown) as FeedRow[], total24h: count ?? 0 };
 });

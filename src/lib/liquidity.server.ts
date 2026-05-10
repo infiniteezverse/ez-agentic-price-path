@@ -82,7 +82,7 @@ export async function fetch0xQuote(params: {
     const text = await res.text();
     const reqId = res.headers.get("x-request-id") ?? "";
     console.error(`[0x] ${res.status} on ${url.pathname} reqId=${reqId} body=${text.slice(0, 300)}`);
-    throw new Error(`0x API error [${res.status}]${reqId ? ` reqId=${reqId}` : ""}: ${text.slice(0, 200)}`);
+    throw new Error("upstream_quote_failed");
   }
 
   const data: any = await res.json();
