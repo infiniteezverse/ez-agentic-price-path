@@ -7,7 +7,7 @@ function buildSpec(origin: string) {
     openapi: "3.1.0",
     info: {
       title: "Agentic Liquidity API",
-      version: "1.0.0",
+      version: "1.1.0",
       description:
         "Pay-per-quote DEX router for autonomous agents. One HTTP endpoint, best-execution across 0x liquidity sources on Ethereum and Base. Locked behind HTTP 402 — agents pay 0.05 USDC per unlock, no API keys, no accounts.",
       contact: { name: "agentic.liquidity", url: PUBLISHED_URL },
