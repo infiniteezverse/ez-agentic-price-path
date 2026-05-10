@@ -76,7 +76,42 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      quote_calls_public: {
+        Row: {
+          chain_id: number | null
+          created_at: string | null
+          id: string | null
+          pair: string | null
+          payer_short: string | null
+          payment_amount_usdc: number | null
+          payment_chain: string | null
+          receipt_tx_hash: string | null
+          unlocked: boolean | null
+        }
+        Insert: {
+          chain_id?: number | null
+          created_at?: string | null
+          id?: string | null
+          pair?: string | null
+          payer_short?: never
+          payment_amount_usdc?: number | null
+          payment_chain?: string | null
+          receipt_tx_hash?: string | null
+          unlocked?: boolean | null
+        }
+        Update: {
+          chain_id?: number | null
+          created_at?: string | null
+          id?: string | null
+          pair?: string | null
+          payer_short?: never
+          payment_amount_usdc?: number | null
+          payment_chain?: string | null
+          receipt_tx_hash?: string | null
+          unlocked?: boolean | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never
