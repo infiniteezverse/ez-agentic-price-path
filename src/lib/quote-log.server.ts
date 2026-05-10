@@ -13,6 +13,7 @@ export type LogQuoteCallInput = {
   unlocked: boolean;
   ip?: string | null;
   userAgent?: string | null;
+  requestId?: string | null;
 };
 
 function hashIp(ip?: string | null): string | null {
