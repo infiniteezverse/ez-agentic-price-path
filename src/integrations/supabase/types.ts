@@ -14,7 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      quote_calls: {
+        Row: {
+          buy_token: string
+          chain_id: number
+          client_ip_hash: string | null
+          created_at: string
+          id: string
+          pair: string
+          payer_address: string | null
+          payment_amount_usdc: number | null
+          payment_chain: string | null
+          receipt_tx_hash: string | null
+          sell_amount: string
+          sell_token: string
+          unlocked: boolean
+          user_agent: string | null
+          verification_error: string | null
+          verification_status: string
+        }
+        Insert: {
+          buy_token: string
+          chain_id: number
+          client_ip_hash?: string | null
+          created_at?: string
+          id?: string
+          pair: string
+          payer_address?: string | null
+          payment_amount_usdc?: number | null
+          payment_chain?: string | null
+          receipt_tx_hash?: string | null
+          sell_amount: string
+          sell_token: string
+          unlocked?: boolean
+          user_agent?: string | null
+          verification_error?: string | null
+          verification_status: string
+        }
+        Update: {
+          buy_token?: string
+          chain_id?: number
+          client_ip_hash?: string | null
+          created_at?: string
+          id?: string
+          pair?: string
+          payer_address?: string | null
+          payment_amount_usdc?: number | null
+          payment_chain?: string | null
+          receipt_tx_hash?: string | null
+          sell_amount?: string
+          sell_token?: string
+          unlocked?: boolean
+          user_agent?: string | null
+          verification_error?: string | null
+          verification_status?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
