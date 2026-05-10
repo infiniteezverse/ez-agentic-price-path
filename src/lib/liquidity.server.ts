@@ -77,18 +77,31 @@ export async function fetch0xQuote(params: {
   }
 
   const data: any = await res.json();
+  // Resolve token decimals so we can derive a human-readable price for v2 responses
+  // (the v2 `price` endpoint returns buyAmount/sellAmount/minBuyAmount but no top-level `price`).
+  const sellTokenInfo = resolveToken(params.chainId, params.sellToken);
+  const buyTokenInfo = resolveToken(params.chainId, params.buyToken);
+  const sellDecimals = sellTokenInfo?.decimals ?? 18;
+  const buyDecimals = buyTokenInfo?.decimals ?? 18;
+
   const buyAmount = String(data.buyAmount ?? "0");
   const sellAmount = String(data.sellAmount ?? params.sellAmount);
-  const price = String(data.price ?? "0");
+
+  // price = buy/sell normalized by decimals (matches v1's price field)
+  const sellHuman = Number(sellAmount) / Math.pow(10, sellDecimals);
+  const buyHuman = Number(buyAmount) / Math.pow(10, buyDecimals);
+  const derivedPrice = sellHuman > 0 ? buyHuman / sellHuman : 0;
+  const price = data.price != null ? String(data.price) : derivedPrice.toString();
+
   const priceImpactPct = data.estimatedPriceImpact != null
     ? Number(data.estimatedPriceImpact)
-    : null;
+    : data.totalNetworkFee != null && buyHuman > 0
+      ? null
+      : null;
 
-  // Estimate "savings vs market" — heuristic: aggregator typically saves 0.1–0.4% over single-venue
-  const sellAmountNum = Number(sellAmount);
-  const naiveOut = sellAmountNum * Number(price) * 0.997; // 0.3% baseline single-pool
-  const realOut = Number(buyAmount);
-  const estimatedSavingsUsd = Math.max(0, (realOut - naiveOut) / Math.pow(10, 6));
+  // Heuristic savings vs single-venue baseline (~0.3% worse execution)
+  const naiveOut = sellHuman * derivedPrice * 0.997;
+  const estimatedSavingsUsd = Math.max(0, (buyHuman - naiveOut));
 
   const sources: Array<{ name: string; proportion: string }> =
     Array.isArray(data.sources)
