@@ -1,0 +1,14 @@
+{
+  "keys": [
+    {
+      "kty": "EC",
+      "crv": "P-256",
+      "kid": "ezlabs-key-1",
+      "use": "sig",
+      "alg": "ES256",
+      "x": "ElWwfK9OsNd4OJlTs9L4H8thTIUogjKr3o51LyfkaWQ",
+      "y": "85Jz3HlRcikwHYP7NDdx899UOJUQy5UEt0mc3Vd0gjk"
+    }
+  ]
+}
+
