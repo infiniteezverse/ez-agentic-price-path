@@ -1,0 +1,23 @@
+{
+  "name": "ezpath-proxy",
+  "version": "1.0.0",
+  "description": "Local X402 proxy for EZ-Path — agents call localhost, proxy handles signing",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": { "ezpath-proxy": "dist/index.js" },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm",
+    "dev":   "tsx src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsup":        "^8.0.0",
+    "tsx":         "^4.0.0",
+    "typescript":  "^5.0.0"
+  },
+  "license": "BSD-2-Clause"
+}

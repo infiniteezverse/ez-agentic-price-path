@@ -1,0 +1,46 @@
+name: Build & Push Proxy to GHCR
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "proxy/**"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE:    ghcr.io/infiniteezverse/ezpath-proxy
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=sha-
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context:  ./proxy
+          push:     true
+          tags:     ${{ steps.meta.outputs.tags }}
+          labels:   ${{ steps.meta.outputs.labels }}

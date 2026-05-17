@@ -1,0 +1,23 @@
+{
+  "name": "plugin-ezpath",
+  "version": "0.1.0",
+  "description": "Eliza plugin for EZ-Path — pay-per-request DEX price router on Base with X402 auto-negotiation",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev":   "tsc --watch"
+  },
+  "keywords": ["eliza", "plugin", "dex", "base", "x402", "uniswap", "swap"],
+  "license": "BSL-1.1",
+  "peerDependencies": {
+    "@elizaos/core": "^0.1.0"
+  },
+  "dependencies": {
+    "viem": "^2.0.0"
+  },
+  "devDependencies": {
+    "@elizaos/core": "^0.1.0",
+    "typescript": "^5.0.0"
+  }
+}

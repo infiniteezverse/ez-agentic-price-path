@@ -1,0 +1,329 @@
+export const WELL_KNOWN_AGENT_JSON = {
+  schema_version: "v2.0",
+  name: "EZ-Path",
+  description: "Pay-per-request DEX meta-router on Base mainnet. Races 0x, ParaSwap, Aerodrome, and Uniswap V3 concurrently and returns the highest buyAmount for any ERC-20 swap. Three execution tiers: basic ($0.03 direct), resilient ($0.10 dual-lane race), institutional ($0.50 race + V3 safety net). Payment via X402 EIP-3009 USDC — no API key, no subscription.",
+  url: "https://ezpath.myezverse.xyz",
+  x402_version: 1,
+  capabilities: [
+    {
+      id: "price_quote",
+      name: "DEX Price Quote",
+      description: "Returns the best available swap quote for any Base ERC-20 pair by racing 0x, ParaSwap, Aerodrome, and Uniswap V3. Includes price, buyAmount, sources, execution_mode, winner, and on-chain settlement_tx.",
+      endpoint: "https://ezpath.myezverse.xyz/api/v1/quote",
+      method: "GET",
+      parameters: [
+        { name: "sellToken",          type: "string",  required: true,  description: "Token address to sell (Base mainnet)" },
+        { name: "buyToken",           type: "string",  required: true,  description: "Token address to buy (Base mainnet)" },
+        { name: "sellAmount",         type: "string",  required: true,  description: "Amount to sell in base decimals" },
+        { name: "slippagePercentage", type: "number",  required: false, description: "Max slippage as decimal, e.g. 0.01 = 1%" },
+      ],
+      response_ref: "/openapi.json#/paths/~1api~1v1~1quote/get/responses/200",
+    },
+  ],
+  payment: {
+    scheme: "x402",
+    asset: "USDC",
+    asset_decimals: 6,
+    chain: "base",
+    chain_id: 8453,
+    address: "0x13dDE704389b1118B20d2BCc6D3Ace749600e2ad",
+    price_usd: 0.03,
+    price_atomic: "30000",
+    asset_contract: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    payment_header: "X-Payment",
+    tiers: {
+      basic:         { price_usd: 0.03, price_atomic: "30000",  description: "Direct 0x execution" },
+      resilient:     { price_usd: 0.10, price_atomic: "100000", description: "Dual-lane concurrent race: 0x/ParaSwap vs Aerodrome" },
+      institutional: { price_usd: 0.50, price_atomic: "500000", description: "Race + Uniswap V3 triple-fee-tier safety net" },
+    },
+  },
+  contact: "contact@ezsecuretech.com",
+  license: "BSD-2-Clause",
+};
+
+export const AGENT_JSON = {
+  schema_version: "v2.0",
+  name_for_model: "ezpath",
+  name_for_human: "EZ-Path",
+  description_for_model:
+    "EZ-Path is a pay-per-request DEX meta-router on Base with three pricing tiers determined by the USDC value in your X402 authorization payload. Basic (≥0.03 USDC, 30000 atomic): direct 0x execution. Resilient (≥0.10 USDC, 100000 atomic): dual-lane concurrent race — 0x/ParaSwap aggregator stack vs Aerodrome on-chain read, highest buyAmount wins. Institutional (≥0.50 USDC, 500000 atomic): dual-lane race plus Uniswap V3 triple-fee-tier on-chain safety net if both lanes fail. To use: call GET /api/v1/quote with sellToken, buyToken, and sellAmount. A 402 response includes a tiers object with exact min_atomic values for each tier. Fund your EIP-3009 authorization.value to the desired tier's min_atomic, include the signed payload in the X-Payment header, and retry. Response includes routing_metadata with execution_mode, winner, and race_comparison.",
+  description_for_human:
+    "A paid, resilient DEX meta-router on Base with X402 payment gating. Best route, best price, guaranteed fallback.",
+  auth: {
+    type: "x402",
+    asset: "USDC",
+    chain: "base",
+    toll_address: "0x13dDE704389b1118B20d2BCc6D3Ace749600e2ad",
+  },
+  api: {
+    type: "openapi",
+    url: "/openapi.json",
+  },
+  pricing_tiers: [
+    {
+      tier: "basic",
+      min_atomic: "30000",
+      price_usd: 0.03,
+      execution_mode: "direct",
+      description: "Direct 0x execution. Reliable baseline for micro-transactions and price discovery.",
+    },
+    {
+      tier: "resilient",
+      min_atomic: "100000",
+      price_usd: 0.10,
+      execution_mode: "concurrent_race",
+      description: "Dual-lane concurrent race: 0x/ParaSwap aggregator stack vs Aerodrome on-chain read. Highest buyAmount wins. Recommended for trades $50–$1,000.",
+    },
+    {
+      tier: "institutional",
+      min_atomic: "500000",
+      price_usd: 0.50,
+      execution_mode: "concurrent_race + emergency_onchain_fallback",
+      description: "Dual-lane race plus Uniswap V3 triple-fee-tier on-chain safety net if both lanes fail. Zero-failure guarantee for heavy capital operations ($1,000+).",
+    },
+  ],
+  "x-why-agents-choose-us": [
+    "Fallback reliability across 3 liquidity sources",
+    "Slippage protection with configurable tolerance",
+    "Meta-aggregation returning the best available price",
+    "Clear per-request economics via X402",
+    "Normalized response shape regardless of upstream source",
+  ],
+};
+
+export const BITTE_AI_PLUGIN_JSON = {
+  openapi: "3.1.0",
+  info: {
+    title: "EZ-Path DEX Router",
+    description: "Pay-per-request DEX meta-router on Base mainnet. Races 0x, ParaSwap, Aerodrome, and Uniswap V3. Best swap quote for any ERC-20 pair. Pay 0.03 USDC per request via X402.",
+    version: "1.0.0",
+  },
+  servers: [{ url: "https://ezpath.myezverse.xyz" }],
+  "x-mb": {
+    "account-id": "92f6ac4fff24ebf39dbc0759fc84e018f8f84bcb020c7ded12500e01e11fa938",
+    assistant: {
+      name: "EZ-Path",
+      description: "DEX meta-router on Base. Races 0x, ParaSwap, Aerodrome & Uniswap V3. Returns best swap quote. Pay 0.03 USDC per request via X402 — no API key needed.",
+      instructions: "You are EZ-Path, a DEX meta-router on Base mainnet. When a user wants a swap quote, call getQuote with sellToken, buyToken, and sellAmount in base decimals. USDC address: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 (6 decimals). WETH address: 0x4200000000000000000000000000000000000006 (18 decimals). Each call requires 0.03 USDC payment via X402 EIP-3009.",
+      tools: [{ type: "function" }],
+      image: "https://ezpath.myezverse.xyz/og.webp",
+      categories: ["defi", "swap", "base"],
+      chainIds: [8453],
+      version: "1.0.0",
+    },
+  },
+};
+
+export const OPENAPI_JSON = {
+  openapi: "3.1.0",
+  info: {
+    title: "EZ-Path DEX Router",
+    version: "1.0.0",
+    description:
+      "X402-gated DEX price router on Base. Returns normalized quotes via 0x. Payment: 0.03 USDC per request via X402, sent in the X-Payment header.",
+  },
+  servers: [{ url: "https://ezpath.myezverse.xyz" }],
+  paths: {
+    "/api/v1/quote": {
+      get: {
+        operationId: "getQuote",
+        summary: "Get a normalized DEX price quote",
+        description:
+          "Returns the best available price for a token swap on Base via 0x. Requires a valid X402 USDC payment in the X-Payment header (falls back to payment-signature for legacy clients). Returns 402 with payment instructions if the header is absent.",
+        parameters: [
+          {
+            name: "sellToken",
+            in: "query",
+            required: true,
+            schema: { type: "string" },
+            description: "ERC-20 contract address of the token to sell (Base mainnet)",
+            example: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+          },
+          {
+            name: "buyToken",
+            in: "query",
+            required: true,
+            schema: { type: "string" },
+            description: "ERC-20 contract address of the token to buy (Base mainnet)",
+            example: "0x4200000000000000000000000000000000000006",
+          },
+          {
+            name: "sellAmount",
+            in: "query",
+            required: true,
+            schema: { type: "string" },
+            description: "Amount to sell expressed in the token's smallest unit (base decimals)",
+            example: "1000000",
+          },
+          {
+            name: "slippagePercentage",
+            in: "query",
+            required: false,
+            schema: { type: "number", minimum: 0, maximum: 1 },
+            description: "Maximum acceptable slippage as a decimal fraction (e.g. 0.01 = 1%)",
+            example: 0.01,
+          },
+        ],
+        security: [{ x402: [] }],
+        responses: {
+          "200": {
+            description: "Normalized quote returned successfully",
+            headers: {
+              "X-Routing-Engine": {
+                schema: { type: "string", example: "0x" },
+                description: "Liquidity source that fulfilled the quote",
+              },
+            },
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["status", "request_id", "sellToken", "buyToken", "sellAmount", "buyAmount", "price", "sources", "routingEngine", "tier"],
+                  properties: {
+                    status:       { type: "string", enum: ["ok"], example: "ok" },
+                    request_id:   { type: "string", format: "uuid", description: "Unique identifier for this request" },
+                    sellToken:    { type: "string", description: "Checksummed address of the token sold" },
+                    buyToken:     { type: "string", description: "Checksummed address of the token bought" },
+                    sellAmount:   { type: "string", description: "Actual sell amount in base decimals" },
+                    buyAmount:    { type: "string", description: "Expected buy amount in base decimals" },
+                    price: {
+                      type: "string",
+                      description: "Human-readable price: buyToken units per 1 sellToken unit, decimal-adjusted. E.g. '0.000443' for USDC→WETH means 1 USDC buys 0.000443 WETH.",
+                      example: "0.000442989247533316",
+                    },
+                    sources: {
+                      type: "array",
+                      description: "Liquidity sources used to fill the swap",
+                      items: {
+                        type: "object",
+                        required: ["name", "proportion"],
+                        properties: {
+                          name:       { type: "string", description: "DEX or AMM name", example: "PancakeSwap_Infinity_CL" },
+                          proportion: { type: "string", description: "Share of fill as a decimal (1 = 100%)", example: "1" },
+                        },
+                      },
+                    },
+                    routingEngine: { type: "string", enum: ["0x", "paraswap"], example: "0x", description: "Upstream aggregator that fulfilled the quote" },
+                    tier:          { type: "string", enum: ["basic", "resilient", "institutional"], example: "basic", description: "Tier resolved from payment amount" },
+                    simulate:      { type: "boolean", description: "True if the request was flagged as a simulation" },
+                    routing_metadata: {
+                      type: "object",
+                      description: "Routing execution trace. Always present.",
+                      required: ["execution_mode", "winner"],
+                      properties: {
+                        execution_mode: { type: "string", enum: ["direct", "concurrent_race", "emergency_onchain_fallback"], description: "How the quote was fulfilled" },
+                        winner:         { type: "string", enum: ["0x", "paraswap", "aerodrome", "uniswap_v3_onchain"], description: "Engine that produced the winning quote" },
+                        race_comparison: {
+                          type: "object",
+                          description: "Raw buyAmount outputs from both lanes. Present on concurrent_race and emergency_onchain_fallback.",
+                          required: ["lane_1_aggregator_out", "lane_2_aerodrome_out"],
+                          properties: {
+                            lane_1_aggregator_out: { type: "string", description: "buyAmount from 0x/paraswap aggregator stack, in base decimals" },
+                            lane_2_aerodrome_out:  { type: "string", description: "buyAmount from Aerodrome on-chain read, in base decimals" },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Missing or malformed query parameters",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["status", "missing", "request_id"],
+                  properties: {
+                    status:     { type: "string", enum: ["bad_request"] },
+                    missing:    { type: "array", items: { type: "string" }, description: "Names of missing required parameters" },
+                    request_id: { type: "string", format: "uuid" },
+                  },
+                },
+              },
+            },
+          },
+          "401": {
+            description: "Payment header present but signature is invalid",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["status", "reason", "request_id"],
+                  properties: {
+                    status:     { type: "string", enum: ["invalid_payment"] },
+                    reason:     { type: "string", description: "Machine-readable rejection reason", example: "payment_expired" },
+                    request_id: { type: "string", format: "uuid" },
+                  },
+                },
+              },
+            },
+          },
+          "402": {
+            description: "No payment header supplied. Retry with a valid X402 USDC signature in X-Payment. Fund your authorization payload to the tier that matches your execution needs.",
+            headers: {
+              "X-402-Price":                { schema: { type: "string" }, description: "Minimum toll (basic tier)", example: "0.03" },
+              "X-402-Price-Resilient":      { schema: { type: "string" }, description: "Toll for resilient tier", example: "0.10" },
+              "X-402-Price-Institutional":  { schema: { type: "string" }, description: "Toll for institutional tier", example: "0.50" },
+              "X-402-Asset":                { schema: { type: "string" }, description: "Payment asset symbol", example: "USDC" },
+              "X-402-Address":              { schema: { type: "string" }, description: "Payee address on Base" },
+              "X-402-Chain":                { schema: { type: "string" }, description: "Chain identifier", example: "base" },
+            },
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["status", "unlock_fee_usd", "request_id", "tiers"],
+                  properties: {
+                    status:         { type: "string", enum: ["payment_required"] },
+                    unlock_fee_usd: { type: "number", example: 0.03 },
+                    request_id:     { type: "string", format: "uuid" },
+                    tiers: {
+                      type: "object",
+                      description: "Full pricing matrix. Set authorization.value to the desired tier's min_atomic to unlock that execution quality.",
+                      properties: {
+                        basic:         { type: "object", properties: { min_atomic: { type: "string", example: "30000"  }, min_usdc: { type: "number", example: 0.03 }, description: { type: "string" } } },
+                        resilient:     { type: "object", properties: { min_atomic: { type: "string", example: "100000" }, min_usdc: { type: "number", example: 0.10 }, description: { type: "string" } } },
+                        institutional: { type: "object", properties: { min_atomic: { type: "string", example: "500000" }, min_usdc: { type: "number", example: 0.50 }, description: { type: "string" } } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "502": {
+            description: "Upstream liquidity source returned an error",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["status", "engine", "request_id"],
+                  properties: {
+                    status:     { type: "string", enum: ["upstream_error"] },
+                    engine:     { type: "string", example: "0x" },
+                    detail:     { type: "string", description: "Raw error message from the upstream API" },
+                    request_id: { type: "string", format: "uuid" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  components: {
+    securitySchemes: {
+      x402: {
+        type: "apiKey",
+        in: "header",
+        name: "X-Payment",
+        description:
+          "X402 payment authorization. Base64-encode the JSON payment payload (EIP-3009 TransferWithAuthorization signed for 0.03 USDC on Base) and set it as this header value. Legacy header name 'payment-signature' is also accepted.",
+      },
+    },
+  },
+};
