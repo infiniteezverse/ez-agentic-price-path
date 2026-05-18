@@ -12,10 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as PlaygroundRouteImport } from './routes/playground'
 import { Route as OpenapiDotjsonRouteImport } from './routes/openapi[.]json'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ApiMcpRouteImport } from './routes/api/mcp'
 import { Route as DotwellKnownJwksDotjsonRouteImport } from './routes/[.]well-known.jwks[.]json'
 import { Route as DotwellKnownAgentDotjsonRouteImport } from './routes/[.]well-known.agent[.]json'
-import { Route as ApiV1QuoteRouteImport } from './routes/api/v1/quote'
 
 const PlaygroundRoute = PlaygroundRouteImport.update({
   id: '/playground',
@@ -32,11 +30,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiMcpRoute = ApiMcpRouteImport.update({
-  id: '/api/mcp',
-  path: '/api/mcp',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const DotwellKnownJwksDotjsonRoute = DotwellKnownJwksDotjsonRouteImport.update({
   id: '/.well-known/jwks.json',
   path: '/.well-known/jwks.json',
@@ -48,11 +41,6 @@ const DotwellKnownAgentDotjsonRoute =
     path: '/.well-known/agent.json',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiV1QuoteRoute = ApiV1QuoteRouteImport.update({
-  id: '/api/v1/quote',
-  path: '/api/v1/quote',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -60,8 +48,6 @@ export interface FileRoutesByFullPath {
   '/playground': typeof PlaygroundRoute
   '/.well-known/agent.json': typeof DotwellKnownAgentDotjsonRoute
   '/.well-known/jwks.json': typeof DotwellKnownJwksDotjsonRoute
-  '/api/mcp': typeof ApiMcpRoute
-  '/api/v1/quote': typeof ApiV1QuoteRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -69,8 +55,6 @@ export interface FileRoutesByTo {
   '/playground': typeof PlaygroundRoute
   '/.well-known/agent.json': typeof DotwellKnownAgentDotjsonRoute
   '/.well-known/jwks.json': typeof DotwellKnownJwksDotjsonRoute
-  '/api/mcp': typeof ApiMcpRoute
-  '/api/v1/quote': typeof ApiV1QuoteRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -79,8 +63,6 @@ export interface FileRoutesById {
   '/playground': typeof PlaygroundRoute
   '/.well-known/agent.json': typeof DotwellKnownAgentDotjsonRoute
   '/.well-known/jwks.json': typeof DotwellKnownJwksDotjsonRoute
-  '/api/mcp': typeof ApiMcpRoute
-  '/api/v1/quote': typeof ApiV1QuoteRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -90,8 +72,6 @@ export interface FileRouteTypes {
     | '/playground'
     | '/.well-known/agent.json'
     | '/.well-known/jwks.json'
-    | '/api/mcp'
-    | '/api/v1/quote'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -99,8 +79,6 @@ export interface FileRouteTypes {
     | '/playground'
     | '/.well-known/agent.json'
     | '/.well-known/jwks.json'
-    | '/api/mcp'
-    | '/api/v1/quote'
   id:
     | '__root__'
     | '/'
@@ -108,8 +86,6 @@ export interface FileRouteTypes {
     | '/playground'
     | '/.well-known/agent.json'
     | '/.well-known/jwks.json'
-    | '/api/mcp'
-    | '/api/v1/quote'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -118,8 +94,6 @@ export interface RootRouteChildren {
   PlaygroundRoute: typeof PlaygroundRoute
   DotwellKnownAgentDotjsonRoute: typeof DotwellKnownAgentDotjsonRoute
   DotwellKnownJwksDotjsonRoute: typeof DotwellKnownJwksDotjsonRoute
-  ApiMcpRoute: typeof ApiMcpRoute
-  ApiV1QuoteRoute: typeof ApiV1QuoteRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -145,13 +119,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/mcp': {
-      id: '/api/mcp'
-      path: '/api/mcp'
-      fullPath: '/api/mcp'
-      preLoaderRoute: typeof ApiMcpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/.well-known/jwks.json': {
       id: '/.well-known/jwks.json'
       path: '/.well-known/jwks.json'
@@ -166,13 +133,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DotwellKnownAgentDotjsonRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/v1/quote': {
-      id: '/api/v1/quote'
-      path: '/api/v1/quote'
-      fullPath: '/api/v1/quote'
-      preLoaderRoute: typeof ApiV1QuoteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -182,8 +142,6 @@ const rootRouteChildren: RootRouteChildren = {
   PlaygroundRoute: PlaygroundRoute,
   DotwellKnownAgentDotjsonRoute: DotwellKnownAgentDotjsonRoute,
   DotwellKnownJwksDotjsonRoute: DotwellKnownJwksDotjsonRoute,
-  ApiMcpRoute: ApiMcpRoute,
-  ApiV1QuoteRoute: ApiV1QuoteRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
