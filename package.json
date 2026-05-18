@@ -7,6 +7,7 @@
     "dev": "vite dev",
     "build": "vite build",
     "build:dev": "vite build --mode development",
+    "build:workers": "esbuild src/index.ts --bundle --platform=browser --format=esm --outdir=dist/workers --external:ws",
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write ."

@@ -3,6 +3,13 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 account_id = "8006c17f0bd3f3b0e8b7979097fc87ed"
 
+[build]
+alias = {
+  "tanstack-start-manifest:v" = "./src/mock-tanstack.ts",
+  "tanstack-start-injected-head-scripts:v" = "./src/mock-tanstack.ts",
+  "#tanstack-start-plugin-adapters" = "./src/mock-tanstack.ts"
+}
+
 [vars]
 CDP_FACILITATOR_URL = "https://x402.org/facilitator"
 SUPABASE_URL = "https://dikmzrgwpjbdnrauffzs.supabase.co"
