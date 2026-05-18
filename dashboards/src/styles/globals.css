@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-background: 20% 0 0;
+  --color-foreground: 98% 0 0;
+  --color-card: 24% 0 0;
+  --color-primary: 70% 0.2 142;
+  --color-primary-dark: 50% 0.2 142;
+  --color-secondary: 64% 0.15 270;
+  --color-accent: 70% 0.18 200;
+  --color-muted: 45% 0.08 0;
+  --color-muted-foreground: 60% 0.1 0;
+  --color-border: 32% 0.08 0;
+  --color-input: 28% 0.08 0;
+  --color-ring: 70% 0.18 200;
+  --color-error: 65% 0.2 25;
+  --color-warning: 74% 0.2 60;
+  --color-success: 68% 0.18 140;
+
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+  .metric-card {
+    @apply rounded-lg border border-border bg-card px-4 py-6 shadow-sm;
+  }
+
+  .metric-label {
+    @apply text-sm font-medium text-muted-foreground;
+  }
+
+  .metric-value {
+    @apply mt-2 text-3xl font-bold text-foreground;
+  }
+
+  .metric-subtext {
+    @apply mt-1 text-xs text-muted-foreground;
+  }
+}
+
+/* Recharts dark theme */
+.recharts-surface {
+  background: transparent;
+}
+
+.recharts-cartesian-axis-tick-value,
+.recharts-legend-item-text {
+  @apply fill-muted-foreground text-xs;
+}
+
+.recharts-cartesian-axis-tick line {
+  @apply stroke-border;
+}
+
+.recharts-cartesian-axis-line {
+  @apply stroke-border;
+}
+
+.recharts-tooltip-wrapper {
+  outline: none !important;
+}
+
+.recharts-default-tooltip {
+  @apply rounded-lg border border-border bg-card p-2 shadow-lg;
+}
+
+.recharts-tooltip-label {
+  @apply font-semibold text-foreground;
+}
+
+.recharts-tooltip-item {
+  @apply text-xs;
+}
