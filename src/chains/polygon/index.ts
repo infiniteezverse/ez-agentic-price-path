@@ -1,5 +1,5 @@
-import { EVMChain } from "../evm/EVMChain";
 import { polygonConfig } from "./config";
+import { EVMChain } from "../evm/EVMChain";
 
 interface Env {
   ZERO_EX_API_KEY: string;
@@ -9,7 +9,6 @@ interface Env {
   METERING: KVNamespace;
   SUPABASE_URL: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
-  BASE_RPC_URL?: string;
 }
 
 export class Polygon extends EVMChain {

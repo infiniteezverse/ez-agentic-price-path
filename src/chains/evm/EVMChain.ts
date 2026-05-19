@@ -409,34 +409,52 @@ export abstract class EVMChain implements IChain {
     const v = parseInt(sig.slice(130, 132), 16);
 
     const account = privateKeyToAccount(this.env.RELAYER_PRIVATE_KEY as `0x${string}`);
-    const client = createWalletClient({
-      account,
-      chain: this.config.viemChain,
-      transport: http(this.config.rpcUrl),
-    });
 
-    const hash = await client.writeContract({
-      address: this.config.paymentToken as `0x${string}`,
-      abi: TRANSFER_WITH_AUTH_ABI,
-      functionName: "transferWithAuthorization",
-      args: [
-        auth.from as `0x${string}`,
-        auth.to as `0x${string}`,
-        BigInt(auth.value),
-        BigInt(auth.validAfter),
-        BigInt(auth.validBefore),
-        auth.nonce as `0x${string}`,
-        v,
-        r,
-        s,
-      ],
-    });
+    // Try RPC fallback array if available, otherwise use single RPC
+    const rpcUrls = this.config.rpcUrls || [this.config.rpcUrl];
+    let lastError: Error | null = null;
 
-    const ttl = Math.max(1, Number(BigInt(auth.validBefore) - BigInt(Math.floor(Date.now() / 1000))));
-    await this.kv.put(`nonce:${auth.nonce}`, hash, { expirationTtl: ttl });
+    for (const rpcUrl of rpcUrls) {
+      try {
+        const client = createWalletClient({
+          account,
+          chain: this.config.viemChain,
+          transport: http(rpcUrl),
+        });
 
-    console.log(`[settlement] submitted tx=${hash} payer=${auth.from} nonce=${auth.nonce}`);
-    return hash;
+        const hash = await client.writeContract({
+          address: this.config.paymentToken as `0x${string}`,
+          abi: TRANSFER_WITH_AUTH_ABI,
+          functionName: "transferWithAuthorization",
+          args: [
+            auth.from as `0x${string}`,
+            auth.to as `0x${string}`,
+            BigInt(auth.value),
+            BigInt(auth.validAfter),
+            BigInt(auth.validBefore),
+            auth.nonce as `0x${string}`,
+            v,
+            r,
+            s,
+          ],
+        });
+
+        const ttl = Math.max(1, Number(BigInt(auth.validBefore) - BigInt(Math.floor(Date.now() / 1000))));
+        await this.kv.put(`nonce:${auth.nonce}`, hash, { expirationTtl: ttl });
+
+        console.log(`[settlement] submitted tx=${hash} payer=${auth.from} nonce=${auth.nonce} rpc=${rpcUrl}`);
+        return hash;
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        console.warn(`[settlement] RPC ${rpcUrl} failed: ${lastError.message}, trying next...`);
+        continue;
+      }
+    }
+
+    if (lastError) {
+      throw new Error(`[settlement] all RPC endpoints failed: ${lastError.message}`);
+    }
+    return null;
   }
 
   async recordMetrics(record: ExecutionRecord): Promise<void> {

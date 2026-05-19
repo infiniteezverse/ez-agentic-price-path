@@ -1,19 +1,20 @@
 export const WELL_KNOWN_AGENT_JSON = {
   schema_version: "v2.0",
   name: "EZ-Path",
-  description: "Pay-per-request DEX meta-router on Base mainnet. Races 10 DEX venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) and returns the highest buyAmount for any ERC-20 swap. Three execution tiers: basic ($0.03 direct), resilient ($0.10 4-venue race), institutional ($0.50 all-10-venue race + MEV protection). Payment via X402 EIP-3009 USDC — no API key, no subscription.",
+  description: "Pay-per-request DEX meta-router on Base, Arbitrum, Optimism, and Polygon. Races 10 DEX venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) across all four chains and returns the highest buyAmount for any ERC-20 swap. Three execution tiers: basic ($0.03 direct), resilient ($0.10 4-venue race), institutional ($0.50 all-10-venue race + MEV protection). Payment via X402 EIP-3009 USDC — no API key, no subscription.",
   url: "https://ezpath.myezverse.xyz",
   x402_version: 1,
   capabilities: [
     {
       id: "price_quote",
       name: "DEX Price Quote",
-      description: "Returns the best available swap quote for any Base ERC-20 pair by racing 10 DEX venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix). Includes price, buyAmount, sources, execution_mode, winner, and on-chain settlement_tx. Institutional tier includes MEV protection via Flashbots private RPC.",
+      description: "Returns the best available swap quote for any ERC-20 pair across Base, Arbitrum, Optimism, and Polygon by racing 10 DEX venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix). Includes price, buyAmount, sources, execution_mode, winner, and on-chain settlement_tx. Institutional tier includes MEV protection.",
       endpoint: "https://ezpath.myezverse.xyz/api/v1/quote",
       method: "GET",
       parameters: [
-        { name: "sellToken",          type: "string",  required: true,  description: "Token address to sell (Base mainnet)" },
-        { name: "buyToken",           type: "string",  required: true,  description: "Token address to buy (Base mainnet)" },
+        { name: "chain",              type: "string",  required: false, description: "Target chain: base, arbitrum, optimism, polygon (default: base)" },
+        { name: "sellToken",          type: "string",  required: true,  description: "Token address to sell" },
+        { name: "buyToken",           type: "string",  required: true,  description: "Token address to buy" },
         { name: "sellAmount",         type: "string",  required: true,  description: "Amount to sell in base decimals" },
         { name: "slippagePercentage", type: "number",  required: false, description: "Max slippage as decimal, e.g. 0.01 = 1%" },
       ],
@@ -326,4 +327,97 @@ export const OPENAPI_JSON = {
       },
     },
   },
+};
+
+export const EZPATH_MANIFEST_JSONLD = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "EZ-Path",
+  description: "Pay-per-request DEX meta-router on Base. Races 10 DEX venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) in parallel to return the highest buyAmount for any ERC-20 swap. Three execution tiers with guaranteed latency SLAs.",
+  url: "https://ezpath.myezverse.xyz",
+  applicationCategory: "FinanceApplication",
+  offers: {
+    "@type": "AggregateOffer",
+    priceCurrency: "USD",
+    offers: [
+      {
+        "@type": "Offer",
+        name: "Basic Tier",
+        price: "0.03",
+        description: "Direct 0x execution. Latency: <150ms. Single venue routing.",
+      },
+      {
+        "@type": "Offer",
+        name: "Resilient Tier",
+        price: "0.10",
+        description: "4-venue concurrent race (0x, ParaSwap, Aerodrome, Curve). Latency: <300ms. Higher quality execution.",
+      },
+      {
+        "@type": "Offer",
+        name: "Institutional Tier",
+        price: "0.50",
+        description: "All 10 venues in parallel with MEV protection. Latency: <350ms. Maximum execution quality.",
+      },
+    ],
+  },
+  supportedChains: [
+    {
+      name: "Base",
+      chainId: 8453,
+      chainString: "eip155:8453",
+      rpcEndpoint: "https://mainnet.base.org",
+    },
+    {
+      name: "Arbitrum",
+      chainId: 42161,
+      chainString: "eip155:42161",
+      rpcEndpoint: "https://arb1.arbitrum.io/rpc",
+    },
+    {
+      name: "Optimism",
+      chainId: 10,
+      chainString: "eip155:10",
+      rpcEndpoint: "https://mainnet.optimism.io",
+    },
+    {
+      name: "Polygon",
+      chainId: 137,
+      chainString: "eip155:137",
+      rpcEndpoint: "https://polygon-rpc.com",
+    },
+  ],
+  supportedTokens: [
+    { symbol: "USDC", address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", decimals: 6 },
+    { symbol: "WETH", address: "0x4200000000000000000000000000000000000006", decimals: 18 },
+    { symbol: "DAI", address: "0x50c5725949a6f0c72e6c4a641f24049a917db0cb", decimals: 18 },
+    { symbol: "cbETH", address: "0x2ae3f1ec7f1f5012cfeab0185bfc7aa3cf0dec22", decimals: 18 },
+    { symbol: "WBTC", address: "0x0555e30da8f98308edb960aa94c0db47230d2b9c", decimals: 8 },
+    { symbol: "EURC", address: "0x60a3e35cc302bfa44cb288bc5a4f316fdb1adb42", decimals: 6 },
+  ],
+  venues: [
+    { name: "0x", priority: 1, timeout: 100 },
+    { name: "ParaSwap", priority: 2, timeout: 100 },
+    { name: "Curve", priority: 3, timeout: 150 },
+    { name: "Balancer", priority: 4, timeout: 150 },
+    { name: "1Inch", priority: 5, timeout: 180 },
+    { name: "CoW Swap", priority: 6, timeout: 180 },
+    { name: "Uniswap V2", priority: 7, timeout: 200 },
+    { name: "Aerodrome", priority: 8, timeout: 250 },
+    { name: "Uniswap V3", priority: 9, timeout: 250 },
+    { name: "Synthetix", priority: 10, timeout: 300 },
+  ],
+  paymentMethod: {
+    "@type": "PaymentMethod",
+    name: "X402 EIP-3009",
+    asset: "USDC",
+    chain: "Base",
+    tollAddress: "0x13dDE704389b1118B20d2BCc6D3Ace749600e2ad",
+  },
+  latencySLA: {
+    basic: { max: 150, unit: "ms" },
+    resilient: { max: 300, unit: "ms" },
+    institutional: { max: 350, unit: "ms" },
+  },
+  availability: "24/7",
+  contact: "contact@ezsecuretech.com",
 };

@@ -1,5 +1,5 @@
 import { handleQuote } from "./quote-router";
-import { AGENT_JSON, BITTE_AI_PLUGIN_JSON, OPENAPI_JSON, WELL_KNOWN_AGENT_JSON } from "./discovery";
+import { AGENT_JSON, BITTE_AI_PLUGIN_JSON, OPENAPI_JSON, WELL_KNOWN_AGENT_JSON, EZPATH_MANIFEST_JSONLD } from "./discovery";
 import { LLMS_MD } from "./llms";
 import { LANDING_HTML } from "./landing";
 import { OG_WEBP_B64 } from "./og";
@@ -135,6 +135,10 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
 
   if (url.pathname === "/.well-known/ai-plugin.json" && request.method === "GET") {
     return corsify(Response.json(BITTE_AI_PLUGIN_JSON));
+  }
+
+  if (url.pathname === "/.well-known/ezpath-manifest.json" && request.method === "GET") {
+    return corsify(Response.json(EZPATH_MANIFEST_JSONLD, { headers: { "Content-Type": "application/ld+json" } }));
   }
 
   if (url.pathname === "/llms.md" && request.method === "GET") {

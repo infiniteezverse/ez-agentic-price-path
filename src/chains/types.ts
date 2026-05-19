@@ -6,6 +6,7 @@ export interface ChainConfig {
   name: string;
   chainId: number;
   rpcUrl: string;
+  rpcUrls?: string[]; // fallback RPC URLs for settlement resilience
   paymentToken: string;
   decimals: number;
   viemChain: any; // viem chain object (null for Solana)

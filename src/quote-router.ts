@@ -53,6 +53,13 @@ const EIP3009_TYPES = {
   ],
 } as const;
 
+function isPriceStale(quoteIssuedAt: number, maxAgeSeconds: number = 15): boolean {
+  const now = Date.now();
+  const ageMs = now - quoteIssuedAt;
+  const ageSeconds = ageMs / 1000;
+  return ageSeconds > maxAgeSeconds;
+}
+
 async function checkRateLimit(
   category: string,
   identifier: string,
@@ -73,7 +80,7 @@ async function checkRateLimit(
 }
 
 async function verifyPayment(paymentHeader: string, kv: KVNamespace): Promise<VerifyResult> {
-  let payload: { payload?: { signature?: string; authorization?: Partial<AuthData> } };
+  let payload: { payload?: { signature?: string; authorization?: Partial<AuthData>; quote_issued_at?: number } };
   try {
     payload = JSON.parse(atob(paymentHeader));
   } catch {
@@ -82,9 +89,15 @@ async function verifyPayment(paymentHeader: string, kv: KVNamespace): Promise<Ve
 
   const raw = payload?.payload?.authorization;
   const sig = payload?.payload?.signature;
+  const quoteIssuedAt = payload?.payload?.quote_issued_at;
 
   if (!raw || !sig) {
     return { isValid: false, invalidReason: "invalid_payment_format", invalidMessage: "missing authorization or signature" };
+  }
+
+  // Check if quote price is stale
+  if (quoteIssuedAt && isPriceStale(quoteIssuedAt, 15)) {
+    return { isValid: false, invalidReason: "price_expired", invalidMessage: "quote is older than 15 seconds, prices may have changed" };
   }
 
   const auth: AuthData = {

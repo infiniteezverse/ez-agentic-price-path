@@ -5,6 +5,12 @@ export const baseConfig: ChainConfig = {
   name: "Base",
   chainId: 8453,
   rpcUrl: "https://mainnet.base.org",
+  rpcUrls: [
+    "https://mainnet.base.org",
+    "https://base.blockpi.network/v1/rpc/public",
+    "https://base.publicnode.com",
+    "https://1rpc.io/base",
+  ],
   paymentToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // USDC
   decimals: 6,
   viemChain: base,
