@@ -5,14 +5,15 @@ import RevenueChart from '../components/charts/RevenueChart'
 import LatencyChart from '../components/charts/LatencyChart'
 import TierBreakdown from '../components/charts/TierBreakdown'
 import { useAgentMetrics } from '../hooks/useMetricsQuery'
+import { usePayerAddress } from '../hooks/useAuthToken'
 import { formatUSD, formatLatency, formatBPS, formatNumber } from '../lib/utils'
 import type { SupportedChain, AgentMetric } from '../lib/types'
 
 export default function AgentDashboard() {
   const [chain, setChain] = useState<SupportedChain>('base')
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
-  const [payer, setPayer] = useState('')
-  const { data: metrics, isLoading, error } = useAgentMetrics(chain, payer, date)
+  const { token: payer } = usePayerAddress()
+  const { data: metrics, isLoading, error } = useAgentMetrics(chain, payer || '', date)
 
   return (
     <div className="min-h-screen bg-background">
@@ -25,32 +26,15 @@ export default function AgentDashboard() {
         isOperator={false}
       />
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {!payer ? (
-          <div className="rounded-lg border border-border bg-card p-8">
-            <h2 className="mb-2 text-xl font-semibold text-foreground">
-              View Your Metrics
-            </h2>
-            <p className="mb-6 text-sm text-muted-foreground">
-              Enter your payer address to see your request history and fees.
-            </p>
-            <input
-              type="text"
-              placeholder="Enter your payer address (0x...)"
-              value={payer}
-              onChange={(e) => setPayer(e.target.value)}
-              className="w-full max-w-md rounded border border-border bg-input px-4 py-2 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
-        ) : (
-          <div className="space-y-8">
-            {error && (
-              <div className="rounded-lg border border-error bg-card p-4">
-                <p className="text-sm text-error">{error.message}</p>
-              </div>
-            )}
+        <div className="space-y-8">
+          {error && (
+            <div className="rounded-lg border border-error bg-card p-4">
+              <p className="text-sm text-error">{error.message}</p>
+            </div>
+          )}
 
-            {/* Metric Cards */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Metric Cards */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <MetricCard
                 label="Total Requests"
                 value={metrics ? formatNumber(metrics.request_count) : '—'}
@@ -77,8 +61,8 @@ export default function AgentDashboard() {
               />
             </div>
 
-            {/* Charts */}
-            <div className="grid gap-4 lg:grid-cols-2">
+          {/* Charts */}
+          <div className="grid gap-4 lg:grid-cols-2">
               <div className="metric-card">
                 <h3 className="mb-4 text-lg font-semibold">Fees Trend</h3>
                 <RevenueChart
@@ -113,10 +97,10 @@ export default function AgentDashboard() {
                   loading={isLoading}
                 />
               </div>
-            </div>
+          </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div className="metric-card">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="metric-card">
                 <h3 className="mb-4 text-lg font-semibold">Tier Breakdown</h3>
                 <TierBreakdown
                   data={metrics?.tier_breakdown}
@@ -150,10 +134,9 @@ export default function AgentDashboard() {
                     <p className="text-sm text-muted-foreground">Loading...</p>
                   )}
                 </div>
-              </div>
             </div>
           </div>
-        )}
+        </div>
       </main>
     </div>
   )

@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { AlertCircle } from 'lucide-react'
 import NavHeader from '../components/header/NavHeader'
 import MetricCard from '../components/metrics/MetricCard'
 import RevenueChart from '../components/charts/RevenueChart'
@@ -16,7 +15,7 @@ import type { SupportedChain, Column, OperatorMetric } from '../lib/types'
 export default function OperatorDashboard() {
   const [chain, setChain] = useState<SupportedChain>('base')
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
-  const { token: adminKey, setToken: setAdminKey, isSet: hasAdminKey } = useAdminKey()
+  const { token: adminKey } = useAdminKey()
   const { data: metrics, isLoading, error } = useOperatorMetrics(chain, date, adminKey)
 
   const metricColumns: Column<OperatorMetric>[] = [
@@ -47,47 +46,6 @@ export default function OperatorDashboard() {
     },
   ]
 
-  if (!hasAdminKey) {
-    return (
-      <div className="min-h-screen bg-background">
-        <NavHeader
-          title="EZ-Path Operator Metrics"
-          chain={chain}
-          onChainChange={setChain}
-          date={date}
-          onDateChange={setDate}
-          isOperator
-        />
-        <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="rounded-lg border border-border bg-card p-8">
-            <div className="flex gap-4">
-              <AlertCircle className="text-warning" size={24} />
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">
-                  Admin Key Required
-                </h2>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Enter your admin API key to view operator metrics.
-                </p>
-                <div className="mt-4">
-                  <input
-                    type="password"
-                    placeholder="Enter admin API key..."
-                    value={adminKey || ''}
-                    onChange={(e) => setAdminKey(e.target.value)}
-                    className="w-full max-w-md rounded border border-border bg-input px-4 py-2 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Your key is stored locally in your browser.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </main>
-      </div>
-    )
-  }
 
   return (
     <div className="min-h-screen bg-background">

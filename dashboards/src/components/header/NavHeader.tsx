@@ -1,6 +1,8 @@
-import { RotateCw } from 'lucide-react'
+import { RotateCw, LogOut } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import ChainSelector from '../metrics/ChainSelector'
 import DateRangePicker from '../metrics/DateRangePicker'
+import { useAdminKey, usePayerAddress } from '../../hooks/useAuthToken'
 import type { SupportedChain } from '../../lib/types'
 
 interface NavHeaderProps {
@@ -20,8 +22,21 @@ export default function NavHeader({
   onDateChange,
   isOperator,
 }: NavHeaderProps) {
+  const navigate = useNavigate()
+  const { clearToken: clearAdminKey } = useAdminKey()
+  const { clearToken: clearPayerAddress } = usePayerAddress()
+
   const handleRefresh = () => {
     window.location.reload()
+  }
+
+  const handleLogout = () => {
+    if (isOperator) {
+      clearAdminKey()
+    } else {
+      clearPayerAddress()
+    }
+    navigate('/login')
   }
 
   return (
@@ -29,6 +44,13 @@ export default function NavHeader({
       <div className="mx-auto max-w-7xl">
         <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
           <h1 className="text-3xl font-bold text-foreground">{title}</h1>
+          <button
+            onClick={handleLogout}
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <LogOut size={16} />
+            <span>Logout</span>
+          </button>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-4">
