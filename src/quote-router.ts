@@ -327,6 +327,20 @@ export async function handleQuote(
 
     const price = calculatePrice(quote.buyAmount, buyToken!, sellAmount!, sellToken!);
 
+    // Trigger settlement async (non-blocking) - facilitator or relayer will settle
+    ctx.waitUntil(
+      (async () => {
+        try {
+          await chainImpl.settle(verification.auth, verification.sig);
+        } catch (settlementErr) {
+          console.error(
+            `[async-settlement] failed: ${settlementErr instanceof Error ? settlementErr.message : settlementErr}`
+          );
+          // Non-fatal: settlement may occur via fallback paths
+        }
+      })()
+    );
+
     return Response.json(
       {
         status: "ok",
