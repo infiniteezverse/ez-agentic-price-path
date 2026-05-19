@@ -5,6 +5,22 @@ import { LANDING_HTML } from "./landing";
 import { OG_WEBP_B64 } from "./og";
 import { handleETL } from "./etl";
 
+declare global {
+  interface KVNamespace {
+    get(key: string): Promise<string | null>;
+    put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
+    delete(key: string): Promise<void>;
+    list(options?: { prefix?: string; limit?: number; cursor?: string }): Promise<{ keys: Array<{ name: string }>; cursor: string }>;
+  }
+  interface ExecutionContext {
+    waitUntil(promise: Promise<any>): void;
+  }
+  interface ScheduledEvent {
+    cron: string;
+    noRetry(): void;
+  }
+}
+
 interface Env {
   ZERO_EX_API_KEY: string;
   PARASWAP_API_KEY?: string;
@@ -66,7 +82,13 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
 
   // ── GET|POST|PUT /api/v1/quote — Delegate to unified router
   if (url.pathname === "/api/v1/quote" && (request.method === "GET" || request.method === "POST" || request.method === "PUT")) {
-    return await handleQuote(request, env, ctx);
+    try {
+      return await handleQuote(request, env, ctx);
+    } catch (err) {
+      const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+      console.error("[index.ts] handleQuote error:", detail);
+      return corsify(Response.json({ status: "handler_error", detail, error_source: "quote_handler" }, { status: 500 }));
+    }
   }
 
   // ── Facilitator endpoints (Bazaar indexing support)
@@ -303,17 +325,17 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
     let totalRevenueAtomic = 0;
 
     await Promise.all(
-      dates.map(async date => {
+      dates.map(async (date: string) => {
         const { keys } = await env.METERING.list({ prefix: `usage:` });
-        const dayKeys = keys.filter(k => k.name.endsWith(`:${date}`));
+        const dayKeys = keys.filter((k: any) => k.name.endsWith(`:${date}`));
 
         const dayRequests = (perDay[date] ??= { requests: 0, revenue_atomic: 0, payers: {} });
 
         await Promise.all(
-          dayKeys.map(async kv => {
-            const payer = kv.name.split(":")[2]; // usage:${chain}:${payer}:${date}
-            const usageVal = parseInt((await env.METERING.get(kv.name)) ?? "0");
-            const revVal = parseInt((await env.METERING.get(`revenue:${kv.name.split(":").slice(1, 3).join(":")}:${date}`)) ?? "0");
+          dayKeys.map(async (k: any) => {
+            const payer = k.name.split(":")[2]; // usage:${chain}:${payer}:${date}
+            const usageVal = parseInt((await env.METERING.get(k.name)) ?? "0");
+            const revVal = parseInt((await env.METERING.get(`revenue:${k.name.split(":").slice(1, 3).join(":")}:${date}`)) ?? "0");
 
             dayRequests.requests += usageVal;
             dayRequests.revenue_atomic += revVal;

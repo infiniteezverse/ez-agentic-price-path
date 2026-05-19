@@ -3,7 +3,7 @@ import { createPublicClient, http } from "viem";
 // ─── Shared EVM Venue Fetchers ───────────────────────────────────────────────
 // These fetchers are chain-agnostic; they accept chainId/network as parameters.
 
-interface NormalizedQuote {
+export interface NormalizedQuote {
   sellToken: string;
   buyToken: string;
   sellAmount: string;

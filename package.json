@@ -10,7 +10,8 @@
     "build:workers": "esbuild src/index.ts --bundle --platform=browser --format=esm --outdir=dist/workers --external:ws",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test-x402": "node --loader tsx test-x402-payment.ts"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",

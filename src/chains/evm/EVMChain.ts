@@ -139,7 +139,7 @@ export abstract class EVMChain implements IChain {
 
     // Determine tier based on payment value (passed separately in router)
     // For now, default to basic tier
-    return this.fetchQuoteBasic(sellToken, buyToken, sellAmount, slippagePercentage);
+    return this.fetchQuoteBasic(sellToken, buyToken, sellAmount, slippagePercentage ?? null);
   }
 
   private async fetchQuoteBasic(
@@ -240,8 +240,8 @@ export abstract class EVMChain implements IChain {
       Number(BigInt(b.quote.buyAmount) - BigInt(a.quote.buyAmount))
     )[0];
 
-    const edgeBps = runnerUp
-      ? Math.round(((BigInt(winner.quote.buyAmount) - BigInt(runnerUp.quote.buyAmount)) * 10000n) / BigInt(runnerUp.quote.buyAmount))
+    const edgeBps: number = runnerUp
+      ? Number(Math.round(Number((BigInt(winner.quote.buyAmount) - BigInt(runnerUp.quote.buyAmount)) * 10000n) / Number(runnerUp.quote.buyAmount)))
       : 0;
 
     console.log(`[resilient] winner=${winner.venue} latency=${winner.latencyMs}ms edge=${edgeBps}bps`);
@@ -305,7 +305,7 @@ export abstract class EVMChain implements IChain {
 
       if (shouldTerminateEarly(BigInt(best.quote.buyAmount), BigInt(runnerUp.quote.buyAmount), 75)) {
         console.log(`[institutional] early termination at ${Date.now() - startTime}ms: ${best.venue} ahead by >75bps, skipping tier 3`);
-        const edgeBps = Math.round(((BigInt(best.quote.buyAmount) - BigInt(runnerUp.quote.buyAmount)) * 10000n) / BigInt(runnerUp.quote.buyAmount));
+        const edgeBps: number = Math.round(Number(((BigInt(best.quote.buyAmount) - BigInt(runnerUp.quote.buyAmount)) * 10000n) / BigInt(runnerUp.quote.buyAmount)));
         return {
           quote: best.quote,
           metadata: {
@@ -345,8 +345,8 @@ export abstract class EVMChain implements IChain {
       Number(BigInt(b.quote.buyAmount) - BigInt(a.quote.buyAmount))
     )[0];
 
-    const edgeBps = runnerUp
-      ? Math.round(((BigInt(winner.quote.buyAmount) - BigInt(runnerUp.quote.buyAmount)) * 10000n) / BigInt(runnerUp.quote.buyAmount))
+    const edgeBps: number = runnerUp
+      ? Number(Math.round(Number((BigInt(winner.quote.buyAmount) - BigInt(runnerUp.quote.buyAmount)) * 10000n) / Number(runnerUp.quote.buyAmount)))
       : 0;
 
     const totalLatency = Date.now() - startTime;
@@ -437,7 +437,8 @@ export abstract class EVMChain implements IChain {
             r,
             s,
           ],
-        });
+          chain: this.config.viemChain,
+        } as any);
 
         const ttl = Math.max(1, Number(BigInt(auth.validBefore) - BigInt(Math.floor(Date.now() / 1000))));
         await this.kv.put(`nonce:${auth.nonce}`, hash, { expirationTtl: ttl });

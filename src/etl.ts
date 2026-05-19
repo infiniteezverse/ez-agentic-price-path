@@ -131,7 +131,7 @@ async function discoverKVKeys(
       }
     }
 
-    if (!result.list_complete) {
+    if (result.cursor) {
       cursor = result.cursor;
     } else {
       break;

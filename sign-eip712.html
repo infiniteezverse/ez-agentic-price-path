@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>EZ Path EIP-712 Signer</title>
+  <style>
+    body { font-family: monospace; background: #0a0e27; color: #e4e4e7; padding: 40px; max-width: 800px; margin: 0 auto; }
+    h1 { color: #3f46e6; }
+    .box { background: #18212f; border: 1px solid #3f46e6; padding: 20px; margin: 20px 0; border-radius: 8px; }
+    button { background: #3f46e6; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; }
+    button:hover { background: #4f51f0; }
+    .sig { background: #0f1419; padding: 15px; border-radius: 4px; word-break: break-all; margin: 10px 0; font-size: 12px; }
+    .success { color: #10b981; }
+    .error { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <h1>EZ Path EIP-712 Signer</h1>
+
+  <div class="box">
+    <h2>Message to Sign (EIP-712)</h2>
+    <pre id="message" style="font-size: 11px; overflow-x: auto;"></pre>
+  </div>
+
+  <div class="box">
+    <button onclick="sign()">Sign with Phantom/MetaMask</button>
+    <div id="status" style="margin-top: 10px;"></div>
+  </div>
+
+  <div class="box" id="result" style="display: none;">
+    <h3 class="success">✓ Signed!</h3>
+    <p>Copy this signature:</p>
+    <div class="sig" id="sig"></div>
+    <button onclick="copy()">Copy to Clipboard</button>
+    <p style="margin-top: 15px; font-size: 12px; color: #a1a1aa;">
+      Then run: <code>SIGNATURE=&lt;paste-here&gt; npm run test-x402</code>
+    </p>
+  </div>
+
+  <script>
+    const msg = {
+      domain: {
+        name: "USD Coin",
+        version: "2",
+        chainId: 8453,
+        verifyingContract: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+      },
+      types: {
+        TransferWithAuthorization: [
+          { name: "from", type: "address" },
+          { name: "to", type: "address" },
+          { name: "value", type: "uint256" },
+          { name: "validAfter", type: "uint256" },
+          { name: "validBefore", type: "uint256" },
+          { name: "nonce", type: "bytes32" }
+        ]
+      },
+      primaryType: "TransferWithAuthorization",
+      message: {
+        from: "0xDE331946DeDb6318FAe10BDD566C48ad4c623F65",
+        to: "0x13dDE704389b1118B20d2BCc6D3Ace749600e2ad",
+        value: "30000",
+        validAfter: "0",
+        validBefore: "1779199144",
+        nonce: "0xcda77f80ddba7be70599aa13fbbbb94cbb89e53fab14862157ca108b9c6d6003"
+      }
+    };
+
+    document.getElementById('message').textContent = JSON.stringify(msg, null, 2);
+
+    let signature = null;
+
+    async function sign() {
+      const status = document.getElementById('status');
+
+      if (!window.ethereum) {
+        status.innerHTML = '<span class="error">❌ Ethereum provider not found. Make sure Phantom or MetaMask is installed and enabled.</span>';
+        return;
+      }
+
+      try {
+        status.innerHTML = 'Requesting account...';
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+
+        if (!accounts || accounts.length === 0) {
+          status.innerHTML = '<span class="error">❌ No accounts. Connect wallet in extension first.</span>';
+          return;
+        }
+
+        status.innerHTML = 'Signing message...';
+
+        const sig = await window.ethereum.request({
+          method: 'eth_signTypedData_v4',
+          params: [accounts[0], JSON.stringify(msg)]
+        });
+
+        signature = sig;
+        status.innerHTML = '<span class="success">✓ Signed successfully!</span>';
+        document.getElementById('sig').textContent = sig;
+        document.getElementById('result').style.display = 'block';
+      } catch (err) {
+        status.innerHTML = '<span class="error">❌ Error: ' + err.message + '</span>';
+      }
+    }
+
+    function copy() {
+      if (!signature) return;
+      navigator.clipboard.writeText(signature).then(() => {
+        alert('Signature copied!');
+      }).catch(() => {
+        alert('Failed to copy. Please select and copy manually.');
+      });
+    }
+  </script>
+</body>
+</html>
