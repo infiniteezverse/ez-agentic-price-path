@@ -69,6 +69,54 @@ interface RoutingMetadata {
   };
 }
 
+// Venue timeout configuration (aggressive timeouts for early termination)
+interface VenueConfig {
+  name: string;
+  timeoutMs: number;
+  priority: number; // 1 = highest priority (called first)
+}
+
+const VENUE_TIMEOUTS: Record<string, VenueConfig> = {
+  "0x": { name: "0x", timeoutMs: 100, priority: 1 },
+  "paraswap": { name: "paraswap", timeoutMs: 100, priority: 2 },
+  "curve": { name: "curve", timeoutMs: 150, priority: 3 },
+  "balancer": { name: "balancer", timeoutMs: 150, priority: 4 },
+  "1inch": { name: "1inch", timeoutMs: 180, priority: 5 },
+  "cow_swap": { name: "cow_swap", timeoutMs: 180, priority: 6 },
+  "uniswap_v2": { name: "uniswap_v2", timeoutMs: 200, priority: 7 },
+  "aerodrome": { name: "aerodrome", timeoutMs: 250, priority: 8 },
+  "uniswap_v3": { name: "uniswap_v3", timeoutMs: 250, priority: 9 },
+  "synthetix": { name: "synthetix", timeoutMs: 300, priority: 10 },
+};
+
+// Helper: Call venue with timeout
+async function callVenueWithTimeout<T>(
+  venueName: string,
+  venueCall: () => Promise<T>,
+  timeoutMs: number,
+): Promise<{ success: boolean; result?: T; error?: string; venue: string }> {
+  return Promise.race([
+    venueCall().then(result => ({ success: true, result, venue: venueName })),
+    new Promise<{ success: false; error: string; venue: string }>(resolve =>
+      setTimeout(
+        () => resolve({ success: false, error: `timeout_${timeoutMs}ms`, venue: venueName }),
+        timeoutMs,
+      ),
+    ),
+  ]);
+}
+
+// Helper: Early termination - if current best is significantly ahead, stop waiting
+function shouldTerminateEarly(
+  bestQuote: bigint,
+  runnerUp: bigint,
+  thresholdBps: number = 100,
+): boolean {
+  if (runnerUp === 0n) return false;
+  const edge = ((bestQuote - runnerUp) * 10000n) / runnerUp;
+  return Number(edge) >= thresholdBps;
+}
+
 export abstract class EVMChain implements IChain {
   protected abstract config: ChainConfig;
   protected env: Env;
@@ -116,26 +164,70 @@ export abstract class EVMChain implements IChain {
     sellAmount: string,
     slippagePercentage: string | null,
   ): Promise<{ quote: NormalizedQuote; metadata: RoutingMetadata }> {
-    // Resilient: 4-way race (aggregators + on-chain pools)
-    const venueResults = await Promise.allSettled([
-      fetchZeroExQuote(sellToken, buyToken, sellAmount, this.config.chainId, slippagePercentage, this.env.ZERO_EX_API_KEY)
-        .catch(e => { throw { venue: "0x", error: e }; }),
-      fetchParaSwapQuote(sellToken, buyToken, sellAmount, String(this.config.chainId), slippagePercentage, this.env.PARASWAP_API_KEY)
-        .catch(e => { throw { venue: "paraswap", error: e }; }),
-      fetchAerodromeQuote(sellToken, buyToken, sellAmount, this.config.contractAddresses?.["aerodrome"] || "",
-        this.config.contractAddresses?.["aerodrome_factory"] || "", this.config.rpcUrl)
-        .catch(e => { throw { venue: "aerodrome", error: e }; }),
-      fetchCurveQuote(sellToken, buyToken, sellAmount, this.config.rpcUrl)
-        .catch(e => { throw { venue: "curve", error: e }; }),
+    // Resilient: 4-venue race with aggressive timeouts (priority ordering)
+    // Fast APIs first (0x, ParaSwap), then medium APIs (Curve, Balancer)
+
+    const results: Array<{ quote: NormalizedQuote; venue: string; latencyMs: number }> = [];
+    const startTime = Date.now();
+
+    // Tier 1: Fast APIs (0x, ParaSwap) - fire immediately with 100ms timeout
+    const [zeroExResult, paraswapResult] = await Promise.all([
+      callVenueWithTimeout(
+        "0x",
+        () => fetchZeroExQuote(sellToken, buyToken, sellAmount, this.config.chainId, slippagePercentage, this.env.ZERO_EX_API_KEY),
+        100,
+      ),
+      callVenueWithTimeout(
+        "paraswap",
+        () => fetchParaSwapQuote(sellToken, buyToken, sellAmount, String(this.config.chainId), slippagePercentage, this.env.PARASWAP_API_KEY),
+        100,
+      ),
     ]);
 
-    const results: Array<{ quote: NormalizedQuote; venue: string }> = [];
-    for (let i = 0; i < venueResults.length; i++) {
-      const r = venueResults[i];
-      if (r.status === "fulfilled") {
-        const venues = ["0x", "paraswap", "aerodrome", "curve"];
-        results.push({ quote: r.value, venue: venues[i] });
+    if (zeroExResult.success) {
+      results.push({ quote: zeroExResult.result!, venue: "0x", latencyMs: Date.now() - startTime });
+    }
+    if (paraswapResult.success) {
+      results.push({ quote: paraswapResult.result!, venue: "paraswap", latencyMs: Date.now() - startTime });
+    }
+
+    // Check if we should terminate early (one venue is significantly ahead)
+    if (results.length >= 2) {
+      const best = results.reduce((b, c) => BigInt(c.quote.buyAmount) > BigInt(b.quote.buyAmount) ? c : b);
+      const runnerUp = results.filter(r => r.venue !== best.venue)[0];
+      if (shouldTerminateEarly(BigInt(best.quote.buyAmount), BigInt(runnerUp.quote.buyAmount), 150)) {
+        console.log(`[resilient] early termination: ${best.venue} ahead by >150bps`);
+        return {
+          quote: best.quote,
+          metadata: {
+            execution_mode: "concurrent_race",
+            winner: best.venue as any,
+            race_comparison: { lane_1_aggregator_out: best.quote.buyAmount, lane_2_aerodrome_out: runnerUp.quote.buyAmount },
+          },
+        };
       }
+    }
+
+    // Tier 2: Medium APIs (Curve, Balancer) - 150ms timeout
+    const [curveResult, aerodromeResult] = await Promise.all([
+      callVenueWithTimeout(
+        "curve",
+        () => fetchCurveQuote(sellToken, buyToken, sellAmount, this.config.rpcUrl),
+        150,
+      ),
+      callVenueWithTimeout(
+        "aerodrome",
+        () => fetchAerodromeQuote(sellToken, buyToken, sellAmount, this.config.contractAddresses?.["aerodrome"] || "",
+          this.config.contractAddresses?.["aerodrome_factory"] || "", this.config.rpcUrl),
+        150,
+      ),
+    ]);
+
+    if (curveResult.success) {
+      results.push({ quote: curveResult.result!, venue: "curve", latencyMs: Date.now() - startTime });
+    }
+    if (aerodromeResult.success) {
+      results.push({ quote: aerodromeResult.result!, venue: "aerodrome", latencyMs: Date.now() - startTime });
     }
 
     if (results.length === 0) throw new Error("all resilient venues failed");
@@ -144,10 +236,15 @@ export abstract class EVMChain implements IChain {
       BigInt(curr.quote.buyAmount) > BigInt(best.quote.buyAmount) ? curr : best
     );
 
-    const runnerUp = results.filter(r => r.venue !== winner.venue)[0];
+    const runnerUp = results.filter(r => r.venue !== winner.venue).sort((a, b) =>
+      Number(BigInt(b.quote.buyAmount) - BigInt(a.quote.buyAmount))
+    )[0];
+
     const edgeBps = runnerUp
       ? Math.round(((BigInt(winner.quote.buyAmount) - BigInt(runnerUp.quote.buyAmount)) * 10000n) / BigInt(runnerUp.quote.buyAmount))
       : 0;
+
+    console.log(`[resilient] winner=${winner.venue} latency=${winner.latencyMs}ms edge=${edgeBps}bps`);
 
     return {
       quote: winner.quote,
@@ -168,53 +265,93 @@ export abstract class EVMChain implements IChain {
     sellAmount: string,
     slippagePercentage: string | null,
   ): Promise<{ quote: NormalizedQuote; metadata: RoutingMetadata }> {
-    // Institutional: Race ALL 10 venues in parallel (budget: <800ms)
-    const venueResults = await Promise.allSettled([
-      fetchZeroExQuote(sellToken, buyToken, sellAmount, this.config.chainId, slippagePercentage, this.env.ZERO_EX_API_KEY),
-      fetchParaSwapQuote(sellToken, buyToken, sellAmount, String(this.config.chainId), slippagePercentage, this.env.PARASWAP_API_KEY),
-      fetchAerodromeQuote(sellToken, buyToken, sellAmount, this.config.contractAddresses?.["aerodrome"] || "",
-        this.config.contractAddresses?.["aerodrome_factory"] || "", this.config.rpcUrl),
-      fetchUniswapV3Quote(sellToken, buyToken, sellAmount, this.config.contractAddresses?.["uniswap_v3"] || "", this.config.rpcUrl),
-      fetchCurveQuote(sellToken, buyToken, sellAmount, this.config.rpcUrl),
-      fetchBalancerQuote(sellToken, buyToken, sellAmount, this.config.rpcUrl),
-      fetchUniswapV2Quote(sellToken, buyToken, sellAmount, this.config.rpcUrl),
-      fetchOneInchQuote(sellToken, buyToken, sellAmount, this.config.chainId),
-      fetchCowSwapQuote(sellToken, buyToken, sellAmount, this.config.chainId),
-      fetchSynthetixQuote(sellToken, buyToken, sellAmount, this.config.rpcUrl),
+    // Institutional: ALL 10 venues with aggressive timeouts + early termination
+    // Budget: 250-350ms instead of full 800ms (via smart timeout ordering)
+    const results: Array<{ quote: NormalizedQuote; venue: string; latencyMs: number }> = [];
+    const startTime = Date.now();
+
+    // Tier 1: Fastest APIs (0x, ParaSwap) - 100ms timeout
+    const tier1Results = await Promise.all([
+      callVenueWithTimeout("0x",
+        () => fetchZeroExQuote(sellToken, buyToken, sellAmount, this.config.chainId, slippagePercentage, this.env.ZERO_EX_API_KEY),
+        100),
+      callVenueWithTimeout("paraswap",
+        () => fetchParaSwapQuote(sellToken, buyToken, sellAmount, String(this.config.chainId), slippagePercentage, this.env.PARASWAP_API_KEY),
+        100),
     ]);
 
-    const venues = ["0x", "paraswap", "aerodrome", "uniswap_v3", "curve", "balancer", "uniswap_v2", "1inch", "cow_swap", "synthetix"];
-    const results: Array<{ quote: NormalizedQuote; venue: string }> = [];
+    for (const r of tier1Results) {
+      if (r.success) results.push({ quote: r.result!, venue: r.venue, latencyMs: Date.now() - startTime });
+    }
 
-    for (let i = 0; i < venueResults.length; i++) {
-      const r = venueResults[i];
-      if (r.status === "fulfilled" && r.value.buyAmount !== "0") {
-        results.push({ quote: r.value, venue: venues[i] });
-      } else if (r.status === "rejected") {
-        console.warn(`[institutional] ${venues[i]} failed: ${r.reason}`);
+    // Tier 2: Medium APIs (Curve, Balancer, 1Inch, CoW) - 150ms timeout
+    const tier2Results = await Promise.all([
+      callVenueWithTimeout("curve", () => fetchCurveQuote(sellToken, buyToken, sellAmount, this.config.rpcUrl), 150),
+      callVenueWithTimeout("balancer", () => fetchBalancerQuote(sellToken, buyToken, sellAmount, this.config.rpcUrl), 150),
+      callVenueWithTimeout("1inch", () => fetchOneInchQuote(sellToken, buyToken, sellAmount, this.config.chainId), 150),
+      callVenueWithTimeout("cow_swap", () => fetchCowSwapQuote(sellToken, buyToken, sellAmount, this.config.chainId), 150),
+    ]);
+
+    for (const r of tier2Results) {
+      if (r.success) results.push({ quote: r.result!, venue: r.venue, latencyMs: Date.now() - startTime });
+    }
+
+    // Early termination check: if we have a clear winner, skip remaining venues
+    if (results.length >= 3) {
+      const best = results.reduce((b, c) => BigInt(c.quote.buyAmount) > BigInt(b.quote.buyAmount) ? c : b);
+      const runnerUp = results.filter(r => r.venue !== best.venue).sort((a, b) =>
+        Number(BigInt(b.quote.buyAmount) - BigInt(a.quote.buyAmount))
+      )[0];
+
+      if (shouldTerminateEarly(BigInt(best.quote.buyAmount), BigInt(runnerUp.quote.buyAmount), 75)) {
+        console.log(`[institutional] early termination at ${Date.now() - startTime}ms: ${best.venue} ahead by >75bps, skipping tier 3`);
+        const edgeBps = Math.round(((BigInt(best.quote.buyAmount) - BigInt(runnerUp.quote.buyAmount)) * 10000n) / BigInt(runnerUp.quote.buyAmount));
+        return {
+          quote: best.quote,
+          metadata: {
+            execution_mode: "concurrent_race",
+            winner: best.venue as any,
+            race_comparison: { lane_1_aggregator_out: best.quote.buyAmount, lane_2_aerodrome_out: runnerUp.quote.buyAmount },
+          },
+        };
       }
     }
 
-    if (results.length === 0) {
-      throw new Error("all 10 venues failed for institutional tier");
+    // Tier 3: Slower APIs (Aerodrome, Uniswap V2, Uniswap V3, Synthetix) - 200-300ms timeout
+    const tier3Results = await Promise.all([
+      callVenueWithTimeout("aerodrome",
+        () => fetchAerodromeQuote(sellToken, buyToken, sellAmount, this.config.contractAddresses?.["aerodrome"] || "",
+          this.config.contractAddresses?.["aerodrome_factory"] || "", this.config.rpcUrl),
+        200),
+      callVenueWithTimeout("uniswap_v2", () => fetchUniswapV2Quote(sellToken, buyToken, sellAmount, this.config.rpcUrl), 200),
+      callVenueWithTimeout("uniswap_v3",
+        () => fetchUniswapV3Quote(sellToken, buyToken, sellAmount, this.config.contractAddresses?.["uniswap_v3"] || "", this.config.rpcUrl),
+        250),
+      callVenueWithTimeout("synthetix", () => fetchSynthetixQuote(sellToken, buyToken, sellAmount, this.config.rpcUrl), 300),
+    ]);
+
+    for (const r of tier3Results) {
+      if (r.success) results.push({ quote: r.result!, venue: r.venue, latencyMs: Date.now() - startTime });
     }
+
+    if (results.length === 0) throw new Error("all 10 institutional venues failed");
 
     // Find best quote
     const winner = results.reduce((best, curr) =>
       BigInt(curr.quote.buyAmount) > BigInt(best.quote.buyAmount) ? curr : best
     );
 
-    // Calculate edge vs runner-up
     const runnerUp = results.filter(r => r.venue !== winner.venue).sort((a, b) =>
-      BigInt(b.quote.buyAmount) - BigInt(a.quote.buyAmount)
+      Number(BigInt(b.quote.buyAmount) - BigInt(a.quote.buyAmount))
     )[0];
 
     const edgeBps = runnerUp
       ? Math.round(((BigInt(winner.quote.buyAmount) - BigInt(runnerUp.quote.buyAmount)) * 10000n) / BigInt(runnerUp.quote.buyAmount))
       : 0;
 
-    // Note: Flashbots MEV protection would be applied here at settlement time
-    // by routing through Flashbots private RPC instead of public mempool
+    const totalLatency = Date.now() - startTime;
+    console.log(`[institutional] winner=${winner.venue} latency=${totalLatency}ms edge=${edgeBps}bps venues_returned=${results.length}/10`);
+
     return {
       quote: winner.quote,
       metadata: {
