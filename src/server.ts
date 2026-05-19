@@ -2,6 +2,7 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { handleRequest as handleCustomRequest } from "./index";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -69,6 +70,23 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const url = new URL(request.url);
+
+      // Route API/facilitator requests to custom handler first
+      if (url.pathname.startsWith("/api/") ||
+          url.pathname.startsWith("/facilitator/") ||
+          url.pathname.startsWith("/.well-known/") ||
+          url.pathname === "/openapi.json" ||
+          url.pathname === "/agent.json" ||
+          url.pathname === "/llms.md" ||
+          url.pathname === "/submit" ||
+          url.pathname === "/" ||
+          url.pathname === "/robots.txt" ||
+          url.pathname === "/sitemap.xml") {
+        return await handleCustomRequest(request, env as any, ctx as any);
+      }
+
+      // Everything else goes to TanStack Start
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);

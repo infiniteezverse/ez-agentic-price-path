@@ -46,7 +46,7 @@ export default {
   },
 };
 
-async function handleRequest(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+export async function handleRequest(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   // OPTIONS preflight
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -79,6 +79,24 @@ async function handleRequest(request: Request, env: Env, ctx: ExecutionContext):
             scheme: "exact",
             network: "base",
             networkId: "eip155:8453",
+          },
+          {
+            x402Version: 1,
+            scheme: "exact",
+            network: "arbitrum",
+            networkId: "eip155:42161",
+          },
+          {
+            x402Version: 1,
+            scheme: "exact",
+            network: "optimism",
+            networkId: "eip155:10",
+          },
+          {
+            x402Version: 1,
+            scheme: "exact",
+            network: "polygon",
+            networkId: "eip155:137",
           },
         ],
       })
