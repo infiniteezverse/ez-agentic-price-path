@@ -64,8 +64,8 @@ export const getQuoteAction: Action = {
   handler: async (
     runtime: IAgentRuntime,
     message: Memory,
-    state: State,
-    _options: Record<string, unknown>,
+    state: State | undefined,
+    _options: Record<string, unknown> | undefined,
     callback?: (response: { text: string }) => void
   ): Promise<boolean> => {
     const walletPrivateKey = runtime.getSetting("EZPATH_WALLET_PRIVATE_KEY");

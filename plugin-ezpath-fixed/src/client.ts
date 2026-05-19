@@ -1,4 +1,4 @@
-import { createWalletClient, http, publicActions, publicClient } from "viem";
+import { createWalletClient, http, publicActions } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
 
@@ -137,7 +137,9 @@ export class EZPathClient {
       };
 
       const client = this.getWalletClient();
+      const account = privateKeyToAccount(this.privateKey as `0x${string}`);
       const signature = await client.signTypedData({
+        account,
         domain,
         types,
         primaryType: "TransferWithAuthorization",
