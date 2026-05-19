@@ -87,6 +87,20 @@ const RL_PAID_LIMIT = 120;
 const USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const TOLL_ADDRESS = "0x13dDE704389b1118B20d2BCc6D3Ace749600e2ad";
 
+// Tier thresholds (in atomic units)
+const TIER_BASIC_ATOMIC = "30000"; // 0.03 USDC
+const TIER_RESILIENT_ATOMIC = "100000"; // 0.1 USDC
+const TIER_INSTITUTIONAL_ATOMIC = "500000"; // 0.5 USDC
+
+type TierType = "basic" | "resilient" | "institutional";
+
+function determineTier(paymentAtomicValue: string): TierType {
+  const val = BigInt(paymentAtomicValue);
+  if (val >= BigInt(TIER_INSTITUTIONAL_ATOMIC)) return "institutional";
+  if (val >= BigInt(TIER_RESILIENT_ATOMIC)) return "resilient";
+  return "basic";
+}
+
 const EIP3009_TYPES = {
   TransferWithAuthorization: [
     { name: "from", type: "address" },
@@ -317,13 +331,40 @@ export async function handleQuote(
     const chainRegistry = createChainRegistry(env, env.METERING);
     const chainImpl = getChain(chainRegistry, chain);
 
-    // Fetch quote from the chain (calls actual venue fetchers)
-    const quote = await chainImpl.fetchQuote({
-      sellToken: sellToken!,
-      buyToken: buyToken!,
-      sellAmount: sellAmount!,
-      slippagePercentage: slippagePercentage ?? undefined,
-    });
+    // Determine tier from payment amount
+    const tier = determineTier(verification.auth.value);
+
+    // Fetch quote from the chain (calls appropriate tier-based venue fetchers)
+    let quote: any;
+    let routingMetadata: any = null;
+
+    if (tier === "institutional" && "fetchQuoteInstitutional" in chainImpl) {
+      const result = await (chainImpl as any).fetchQuoteInstitutional(
+        sellToken!,
+        buyToken!,
+        sellAmount!,
+        slippagePercentage ?? null
+      );
+      quote = result.quote;
+      routingMetadata = result.metadata;
+    } else if (tier === "resilient" && "fetchQuoteResilient" in chainImpl) {
+      const result = await (chainImpl as any).fetchQuoteResilient(
+        sellToken!,
+        buyToken!,
+        sellAmount!,
+        slippagePercentage ?? null
+      );
+      quote = result.quote;
+      routingMetadata = result.metadata;
+    } else {
+      // Default to basic tier for all chains
+      quote = await chainImpl.fetchQuote({
+        sellToken: sellToken!,
+        buyToken: buyToken!,
+        sellAmount: sellAmount!,
+        slippagePercentage: slippagePercentage ?? undefined,
+      });
+    }
 
     const price = calculatePrice(quote.buyAmount, buyToken!, sellAmount!, sellToken!);
 
@@ -351,15 +392,15 @@ export async function handleQuote(
         buyAmount: quote.buyAmount,
         price,
         sources: quote.sources.map(s => s.name),
-        routingEngine: quote.sources[0]?.name ?? "unknown",
-        tier: "basic",
+        routingEngine: routingMetadata?.winner ?? quote.sources[0]?.name ?? "unknown",
+        tier,
         simulate: false,
         expiresAt,
       },
       {
         status: 200,
         headers: {
-          "X-Routing-Engine": quote.sources[0]?.name ?? "0x",
+          "X-Routing-Engine": routingMetadata?.winner ?? quote.sources[0]?.name ?? "0x",
           "X-Settlement-Tx": "0x" + crypto.randomUUID().replace(/-/g, "").slice(0, 64),
           "EXTENSION-RESPONSES": btoa(JSON.stringify({ bazaar: { acknowledged: true, settled: true } })),
         },
