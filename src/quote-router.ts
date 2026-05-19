@@ -219,7 +219,19 @@ export async function handleQuote(
           institutional: { min_atomic: "500000", min_usdc: 0.5, description: "Dual-lane race + Uniswap V3 safety net" },
         },
       },
-      { status: 402 }
+      {
+        status: 402,
+        headers: {
+          "WWW-Authenticate": 'X402 realm="EZ-Path DEX Router", scheme="eip3009", token="USDC", chain="base"',
+          "X-Payment-Required": "true",
+          "X-Payment-Header": "X-Payment",
+          "X-Payment-Scheme": "x402-eip3009",
+          "X-Payment-Chain": "eip155:8453",
+          "X-Payment-Token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+          "X-Payment-Address": "0x13dDE704389b1118B20d2BCc6D3Ace749600e2ad",
+          "X-Payment-Manifest": "https://ezpath.myezverse.xyz/.well-known/agent.json",
+        },
+      }
     );
   }
 
