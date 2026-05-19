@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { paymentRequirements } from "@/lib/quote-log.server";
+import { paymentRequirements } from "@/lib/cdp-facilitator.server";
 import { bazaarExtension } from "@/lib/dashboard.functions";
 import { UNLOCK_FEE_DOLLARS } from "@/lib/utils";
 
