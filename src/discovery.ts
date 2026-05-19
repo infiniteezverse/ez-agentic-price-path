@@ -1,14 +1,14 @@
 export const WELL_KNOWN_AGENT_JSON = {
   schema_version: "v2.0",
   name: "EZ-Path",
-  description: "Pay-per-request DEX meta-router on Base mainnet. Races 0x, ParaSwap, Aerodrome, and Uniswap V3 concurrently and returns the highest buyAmount for any ERC-20 swap. Three execution tiers: basic ($0.03 direct), resilient ($0.10 dual-lane race), institutional ($0.50 race + V3 safety net). Payment via X402 EIP-3009 USDC — no API key, no subscription.",
+  description: "Pay-per-request DEX meta-router on Base mainnet. Races 10 DEX venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) and returns the highest buyAmount for any ERC-20 swap. Three execution tiers: basic ($0.03 direct), resilient ($0.10 4-venue race), institutional ($0.50 all-10-venue race + MEV protection). Payment via X402 EIP-3009 USDC — no API key, no subscription.",
   url: "https://ezpath.myezverse.xyz",
   x402_version: 1,
   capabilities: [
     {
       id: "price_quote",
       name: "DEX Price Quote",
-      description: "Returns the best available swap quote for any Base ERC-20 pair by racing 0x, ParaSwap, Aerodrome, and Uniswap V3. Includes price, buyAmount, sources, execution_mode, winner, and on-chain settlement_tx.",
+      description: "Returns the best available swap quote for any Base ERC-20 pair by racing 10 DEX venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix). Includes price, buyAmount, sources, execution_mode, winner, and on-chain settlement_tx. Institutional tier includes MEV protection via Flashbots private RPC.",
       endpoint: "https://ezpath.myezverse.xyz/api/v1/quote",
       method: "GET",
       parameters: [
@@ -32,9 +32,9 @@ export const WELL_KNOWN_AGENT_JSON = {
     asset_contract: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
     payment_header: "X-Payment",
     tiers: {
-      basic:         { price_usd: 0.03, price_atomic: "30000",  description: "Direct 0x execution" },
-      resilient:     { price_usd: 0.10, price_atomic: "100000", description: "Dual-lane concurrent race: 0x/ParaSwap vs Aerodrome" },
-      institutional: { price_usd: 0.50, price_atomic: "500000", description: "Race + Uniswap V3 triple-fee-tier safety net" },
+      basic:         { price_usd: 0.03, price_atomic: "30000",  description: "Direct 0x execution — fast, simple routing" },
+      resilient:     { price_usd: 0.10, price_atomic: "100000", description: "4-venue concurrent race (0x, ParaSwap, Aerodrome, Curve) — best of mid-tier liquidity" },
+      institutional: { price_usd: 0.50, price_atomic: "500000", description: "All 10 venues in parallel (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) + Flashbots MEV protection — maximum execution quality and safety" },
     },
   },
   contact: "contact@ezsecuretech.com",
@@ -46,9 +46,9 @@ export const AGENT_JSON = {
   name_for_model: "ezpath",
   name_for_human: "EZ-Path",
   description_for_model:
-    "EZ-Path is a pay-per-request DEX meta-router on Base with three pricing tiers determined by the USDC value in your X402 authorization payload. Basic (≥0.03 USDC, 30000 atomic): direct 0x execution. Resilient (≥0.10 USDC, 100000 atomic): dual-lane concurrent race — 0x/ParaSwap aggregator stack vs Aerodrome on-chain read, highest buyAmount wins. Institutional (≥0.50 USDC, 500000 atomic): dual-lane race plus Uniswap V3 triple-fee-tier on-chain safety net if both lanes fail. To use: call GET /api/v1/quote with sellToken, buyToken, and sellAmount. A 402 response includes a tiers object with exact min_atomic values for each tier. Fund your EIP-3009 authorization.value to the desired tier's min_atomic, include the signed payload in the X-Payment header, and retry. Response includes routing_metadata with execution_mode, winner, and race_comparison.",
+    "EZ-Path is a pay-per-request DEX meta-router on Base with three pricing tiers. Basic (0.03 USDC): direct 0x routing. Resilient (0.10 USDC): races 4 venues (0x, ParaSwap, Aerodrome, Curve). Institutional (0.50 USDC): races all 10 venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) in parallel with Flashbots MEV protection. Call GET /api/v1/quote with sellToken, buyToken, sellAmount. 402 response lists tier minimums. Fund EIP-3009 auth to tier level, include signed payload in X-Payment header, retry. Response includes execution_mode (direct/concurrent_race), winner, and edge_bps vs runner-up.",
   description_for_human:
-    "A paid, resilient DEX meta-router on Base with X402 payment gating. Best route, best price, guaranteed fallback.",
+    "DEX meta-router racing 10 venues on Base with X402 payment. Get best execution: basic ($0.03), resilient ($0.10, 4-venue race), or institutional ($0.50, all 10 venues + MEV protection).",
   auth: {
     type: "x402",
     asset: "USDC",

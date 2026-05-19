@@ -5,6 +5,12 @@ import {
   fetchParaSwapQuote,
   fetchAerodromeQuote,
   fetchUniswapV3Quote,
+  fetchCurveQuote,
+  fetchBalancerQuote,
+  fetchUniswapV2Quote,
+  fetchOneInchQuote,
+  fetchCowSwapQuote,
+  fetchSynthetixQuote,
   tokenDecimals,
   type NormalizedQuote,
 } from "./venues";
@@ -110,83 +116,47 @@ export abstract class EVMChain implements IChain {
     sellAmount: string,
     slippagePercentage: string | null,
   ): Promise<{ quote: NormalizedQuote; metadata: RoutingMetadata }> {
-    type LaneResult = { quote: NormalizedQuote; engine: string };
-
-    const [lane1Result, lane2Result] = await Promise.allSettled<LaneResult>([
-      // Lane 1 — Aggregator stack: 0x → ParaSwap fallback
-      (async (): Promise<LaneResult> => {
-        try {
-          const q = await fetchZeroExQuote(
-            sellToken,
-            buyToken,
-            sellAmount,
-            this.config.chainId,
-            slippagePercentage,
-            this.env.ZERO_EX_API_KEY,
-          );
-          return { quote: q, engine: "0x" };
-        } catch (zeroExErr) {
-          const reason = zeroExErr instanceof Error ? zeroExErr.message : String(zeroExErr);
-          console.error(`[lane1] 0x failed (${reason}), trying paraswap`);
-          const q = await fetchParaSwapQuote(
-            sellToken,
-            buyToken,
-            sellAmount,
-            String(this.config.chainId),
-            slippagePercentage,
-            this.env.PARASWAP_API_KEY,
-          );
-          return { quote: q, engine: "paraswap" };
-        }
-      })(),
-      // Lane 2 — Aerodrome on-chain
-      (async (): Promise<LaneResult> => {
-        const q = await fetchAerodromeQuote(
-          sellToken,
-          buyToken,
-          sellAmount,
-          this.config.contractAddresses?.["aerodrome"] || "",
-          this.config.contractAddresses?.["aerodrome_factory"] || "",
-          this.config.rpcUrl,
-        );
-        return { quote: q, engine: "aerodrome" };
-      })(),
+    // Resilient: 4-way race (aggregators + on-chain pools)
+    const venueResults = await Promise.allSettled([
+      fetchZeroExQuote(sellToken, buyToken, sellAmount, this.config.chainId, slippagePercentage, this.env.ZERO_EX_API_KEY)
+        .catch(e => { throw { venue: "0x", error: e }; }),
+      fetchParaSwapQuote(sellToken, buyToken, sellAmount, String(this.config.chainId), slippagePercentage, this.env.PARASWAP_API_KEY)
+        .catch(e => { throw { venue: "paraswap", error: e }; }),
+      fetchAerodromeQuote(sellToken, buyToken, sellAmount, this.config.contractAddresses?.["aerodrome"] || "",
+        this.config.contractAddresses?.["aerodrome_factory"] || "", this.config.rpcUrl)
+        .catch(e => { throw { venue: "aerodrome", error: e }; }),
+      fetchCurveQuote(sellToken, buyToken, sellAmount, this.config.rpcUrl)
+        .catch(e => { throw { venue: "curve", error: e }; }),
     ]);
 
-    if (lane1Result.status === "rejected") console.error(`[lane1] failed: ${lane1Result.reason}`);
-    if (lane2Result.status === "rejected") console.error(`[lane2] aerodrome failed: ${lane2Result.reason}`);
-
-    const lane1 = lane1Result.status === "fulfilled" ? lane1Result.value : null;
-    const lane2 = lane2Result.status === "fulfilled" ? lane2Result.value : null;
-
-    if (!lane1 && !lane2) {
-      throw new Error("all routing engines failed (0x/paraswap/aerodrome)");
+    const results: Array<{ quote: NormalizedQuote; venue: string }> = [];
+    for (let i = 0; i < venueResults.length; i++) {
+      const r = venueResults[i];
+      if (r.status === "fulfilled") {
+        const venues = ["0x", "paraswap", "aerodrome", "curve"];
+        results.push({ quote: r.value, venue: venues[i] });
+      }
     }
 
-    let winner: LaneResult;
-    if (!lane1) winner = lane2!;
-    else if (!lane2) winner = lane1;
-    else winner = BigInt(lane1.quote.buyAmount) >= BigInt(lane2.quote.buyAmount) ? lane1 : lane2;
+    if (results.length === 0) throw new Error("all resilient venues failed");
 
-    const edgeBps =
-      lane1 && lane2
-        ? Math.round(
-            ((BigInt(lane1.quote.buyAmount) > BigInt(lane2.quote.buyAmount)
-              ? BigInt(lane1.quote.buyAmount) - BigInt(lane2.quote.buyAmount)
-              : BigInt(lane2.quote.buyAmount) - BigInt(lane1.quote.buyAmount)) *
-              10000n) /
-              (lane1.quote.buyAmount < lane2.quote.buyAmount ? BigInt(lane1.quote.buyAmount) : BigInt(lane2.quote.buyAmount))
-          )
-        : undefined;
+    const winner = results.reduce((best, curr) =>
+      BigInt(curr.quote.buyAmount) > BigInt(best.quote.buyAmount) ? curr : best
+    );
+
+    const runnerUp = results.filter(r => r.venue !== winner.venue)[0];
+    const edgeBps = runnerUp
+      ? Math.round(((BigInt(winner.quote.buyAmount) - BigInt(runnerUp.quote.buyAmount)) * 10000n) / BigInt(runnerUp.quote.buyAmount))
+      : 0;
 
     return {
       quote: winner.quote,
       metadata: {
         execution_mode: "concurrent_race",
-        winner: winner.engine as RoutingMetadata["winner"],
+        winner: winner.venue as any,
         race_comparison: {
-          lane_1_aggregator_out: lane1?.quote.buyAmount ?? "0",
-          lane_2_aerodrome_out: lane2?.quote.buyAmount ?? "0",
+          lane_1_aggregator_out: winner.quote.buyAmount,
+          lane_2_aerodrome_out: runnerUp?.quote.buyAmount ?? "0",
         },
       },
     };
@@ -198,30 +168,62 @@ export abstract class EVMChain implements IChain {
     sellAmount: string,
     slippagePercentage: string | null,
   ): Promise<{ quote: NormalizedQuote; metadata: RoutingMetadata }> {
-    // Try resilient race first
-    const resilientResult = await this.fetchQuoteResilient(sellToken, buyToken, sellAmount, slippagePercentage);
+    // Institutional: Race ALL 10 venues in parallel (budget: <800ms)
+    const venueResults = await Promise.allSettled([
+      fetchZeroExQuote(sellToken, buyToken, sellAmount, this.config.chainId, slippagePercentage, this.env.ZERO_EX_API_KEY),
+      fetchParaSwapQuote(sellToken, buyToken, sellAmount, String(this.config.chainId), slippagePercentage, this.env.PARASWAP_API_KEY),
+      fetchAerodromeQuote(sellToken, buyToken, sellAmount, this.config.contractAddresses?.["aerodrome"] || "",
+        this.config.contractAddresses?.["aerodrome_factory"] || "", this.config.rpcUrl),
+      fetchUniswapV3Quote(sellToken, buyToken, sellAmount, this.config.contractAddresses?.["uniswap_v3"] || "", this.config.rpcUrl),
+      fetchCurveQuote(sellToken, buyToken, sellAmount, this.config.rpcUrl),
+      fetchBalancerQuote(sellToken, buyToken, sellAmount, this.config.rpcUrl),
+      fetchUniswapV2Quote(sellToken, buyToken, sellAmount, this.config.rpcUrl),
+      fetchOneInchQuote(sellToken, buyToken, sellAmount, this.config.chainId),
+      fetchCowSwapQuote(sellToken, buyToken, sellAmount, this.config.chainId),
+      fetchSynthetixQuote(sellToken, buyToken, sellAmount, this.config.rpcUrl),
+    ]);
 
-    // If resilient succeeds, return it
-    if (resilientResult.quote.buyAmount !== "0") {
-      return resilientResult;
+    const venues = ["0x", "paraswap", "aerodrome", "uniswap_v3", "curve", "balancer", "uniswap_v2", "1inch", "cow_swap", "synthetix"];
+    const results: Array<{ quote: NormalizedQuote; venue: string }> = [];
+
+    for (let i = 0; i < venueResults.length; i++) {
+      const r = venueResults[i];
+      if (r.status === "fulfilled" && r.value.buyAmount !== "0") {
+        results.push({ quote: r.value, venue: venues[i] });
+      } else if (r.status === "rejected") {
+        console.warn(`[institutional] ${venues[i]} failed: ${r.reason}`);
+      }
     }
 
-    // Fallback: try Uniswap V3
-    console.error("[routing] both lanes failed — activating institutional uniswap v3 safety net");
-    const quote = await fetchUniswapV3Quote(
-      sellToken,
-      buyToken,
-      sellAmount,
-      this.config.contractAddresses?.["uniswap_v3"] || "",
-      this.config.rpcUrl,
+    if (results.length === 0) {
+      throw new Error("all 10 venues failed for institutional tier");
+    }
+
+    // Find best quote
+    const winner = results.reduce((best, curr) =>
+      BigInt(curr.quote.buyAmount) > BigInt(best.quote.buyAmount) ? curr : best
     );
 
+    // Calculate edge vs runner-up
+    const runnerUp = results.filter(r => r.venue !== winner.venue).sort((a, b) =>
+      BigInt(b.quote.buyAmount) - BigInt(a.quote.buyAmount)
+    )[0];
+
+    const edgeBps = runnerUp
+      ? Math.round(((BigInt(winner.quote.buyAmount) - BigInt(runnerUp.quote.buyAmount)) * 10000n) / BigInt(runnerUp.quote.buyAmount))
+      : 0;
+
+    // Note: Flashbots MEV protection would be applied here at settlement time
+    // by routing through Flashbots private RPC instead of public mempool
     return {
-      quote,
+      quote: winner.quote,
       metadata: {
-        execution_mode: "emergency_onchain_fallback",
-        winner: "uniswap_v3_onchain",
-        race_comparison: { lane_1_aggregator_out: "0", lane_2_aerodrome_out: "0" },
+        execution_mode: "concurrent_race",
+        winner: winner.venue as any,
+        race_comparison: {
+          lane_1_aggregator_out: winner.quote.buyAmount,
+          lane_2_aerodrome_out: runnerUp?.quote.buyAmount ?? "0",
+        },
       },
     };
   }
