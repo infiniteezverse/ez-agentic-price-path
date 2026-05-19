@@ -1,0 +1,27 @@
+{
+  "name": "@ezpath/plugin-ezpath",
+  "version": "1.0.0",
+  "description": "EZ-Path: Pay-per-request DEX meta-router on Base mainnet with x402 v2 x402 v2 integration",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "viem": "^2.0.0",
+    "zod": "^3.22.0"
+  },
+  "peerDependencies": {
+    "@elizaos/core": "^0.1.0"
+  },
+  "devDependencies": {
+    "@elizaos/core": "^0.1.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
