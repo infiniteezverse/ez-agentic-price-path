@@ -323,7 +323,7 @@ export const OPENAPI_JSON = {
         in: "header",
         name: "X-Payment",
         description:
-          "X402 payment authorization. Base64-encode the JSON payment payload (EIP-3009 TransferWithAuthorization signed for 0.03 USDC on Base) and set it as this header value. Legacy header name 'payment-signature' is also accepted.",
+          "X402 payment authorization. Three paths supported: (1) EIP-3009 — base64-encode a signed TransferWithAuthorization JSON payload; (2) Base MCP — use initiate_x402_request pointing at this endpoint with maxPayment='0.03', then complete_x402_request; (3) Coinbase Smart Wallet — x402Version:1, scheme:exact, network:base format natively accepted. Legacy header name 'payment-signature' also accepted.",
       },
     },
   },

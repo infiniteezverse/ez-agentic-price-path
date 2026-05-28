@@ -38,7 +38,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "ezpath_quote",
       description:
-        "Get the best DEX swap quote on Base mainnet by racing 0x, ParaSwap, Aerodrome, and Uniswap V3. Automatically pays USDC per request via X402 EIP-3009 from the configured wallet. Requires EZPATH_WALLET_KEY env var set to a Base wallet private key with USDC balance.",
+        "Get the best DEX swap quote on Base mainnet by racing 0x, ParaSwap, Aerodrome, and Uniswap V3. Payment of $0.03 USDC per request via X402. Two payment paths: (1) set EZPATH_WALLET_KEY env var to a Base wallet private key with USDC balance for EIP-3009 signing; (2) use Base MCP's initiate_x402_request + complete_x402_request pointing at https://ezpath.myezverse.xyz/api/v1/quote — no wallet key required.",
       inputSchema: {
         type: "object",
         properties: {

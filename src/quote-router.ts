@@ -284,7 +284,7 @@ async function verifyViaFacilitator(
           scheme: "exact",
           network: "base",
           maxAmountRequired: String(PRICE_ATOMIC),
-          resource: requestUrl,
+          resource: "https://ezpath.myezverse.xyz/api/v1/quote",
           description: "EZ-Path DEX Quote",
           mimeType: "application/json",
           payTo: TOLL_ADDRESS,
@@ -295,7 +295,6 @@ async function verifyViaFacilitator(
       }),
     });
     const data = (await res.json()) as { isValid?: boolean; invalidReason?: string };
-    console.log("[payment-debug] facilitator raw response:", JSON.stringify(data));
     if (data.isValid) {
       return { isValid: true, payer: "facilitator-verified" };
     }
@@ -366,7 +365,7 @@ export async function handleQuote(
           {
             scheme: "exact",
             network: "base",
-            maxAmountRequired: "30000",
+            maxAmountRequired: String(PRICE_ATOMIC),
             resource: "https://ezpath.myezverse.xyz/api/v1/quote",
             description: "EZ-Path DEX Quote — best rate across 0x, ParaSwap, Aerodrome, Uniswap V3",
             mimeType: "application/json",
@@ -433,7 +432,6 @@ export async function handleQuote(
         else if (await env.METERING.get(`nonce:${nonce}`))
           verification = { isValid: false, invalidReason: "nonce_already_used", invalidMessage: "nonce already used" };
         else {
-          console.log("[payment-debug] accepted via Base MCP smart wallet trust path");
           verification = { isValid: true, payer: raw.from ?? "base-mcp", auth: raw as AuthData };
         }
       }
