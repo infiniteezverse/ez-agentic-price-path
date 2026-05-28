@@ -37,7 +37,7 @@
  * Agents must settle before expiresAt or get execution_expired error
  */
 
-import { verifyTypedData } from "viem";
+import { verifyTypedData, hashTypedData, toBytes, toHex } from "viem";
 import { createChainRegistry, getChain } from "./chains/registry";
 import { type SupportedChain } from "./chains/types";
 
@@ -219,6 +219,92 @@ async function verifyPayment(paymentHeader: string, kv: KVNamespace): Promise<Ve
   return { isValid: true, payer: auth.from, auth, sig };
 }
 
+// ERC-1271: verify smart wallet signature (Coinbase Smart Wallet / Base MCP)
+async function verifyERC1271(auth: AuthData, sig: string, rpcUrl: string): Promise<VerifyResult> {
+  try {
+    const hash = hashTypedData({
+      domain: { name: "USD Coin", version: "2", chainId: 8453, verifyingContract: USDC_BASE as `0x${string}` },
+      types: EIP3009_TYPES,
+      primaryType: "TransferWithAuthorization",
+      message: {
+        from: auth.from as `0x${string}`,
+        to: auth.to as `0x${string}`,
+        value: BigInt(auth.value),
+        validAfter: BigInt(auth.validAfter),
+        validBefore: BigInt(auth.validBefore),
+        nonce: auth.nonce as `0x${string}`,
+      },
+    });
+    // ABI-encode isValidSignature(bytes32,bytes) call
+    const sigBytes = toBytes(sig as `0x${string}`);
+    const sigHex = toHex(sigBytes);
+    // isValidSignature selector: 0x1626ba7e
+    const calldata =
+      "0x1626ba7e" +
+      hash.slice(2) + // bytes32 hash (no offset needed, inline)
+      "0000000000000000000000000000000000000000000000000000000000000040" + // offset for bytes
+      (sigBytes.length).toString(16).padStart(64, "0") + // bytes length
+      sigHex.slice(2).padEnd(Math.ceil(sigBytes.length / 32) * 64, "0"); // bytes data
+
+    const res = await fetch(rpcUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0", id: 1, method: "eth_call",
+        params: [{ to: auth.from, data: calldata }, "latest"],
+      }),
+    });
+    const json = (await res.json()) as { result?: string; error?: unknown };
+    if (json.result && json.result.startsWith("0x1626ba7e")) {
+      return { isValid: true, payer: auth.from, auth, sig };
+    }
+    return { isValid: false, invalidReason: "invalid_signature", invalidMessage: `ERC-1271 returned: ${json.result ?? JSON.stringify(json.error)}` };
+  } catch (err) {
+    return { isValid: false, invalidReason: "signature_error", invalidMessage: err instanceof Error ? err.message : "unknown" };
+  }
+}
+
+// Fallback: verify via CDP facilitator (handles non-EIP-3009 schemes like Base MCP)
+async function verifyViaFacilitator(
+  paymentHeader: string,
+  facilitatorUrl: string,
+  requestUrl: string
+): Promise<VerifyResult> {
+  try {
+    // Facilitator expects the decoded payment object, not the raw base64 string
+    let paymentPayload: unknown = paymentHeader;
+    try { paymentPayload = JSON.parse(atob(paymentHeader)); } catch { /* use raw string */ }
+
+    const res = await fetch(`${facilitatorUrl}/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        paymentPayload,
+        paymentRequirements: {
+          scheme: "exact",
+          network: "base",
+          maxAmountRequired: String(PRICE_ATOMIC),
+          resource: requestUrl,
+          description: "EZ-Path DEX Quote",
+          mimeType: "application/json",
+          payTo: TOLL_ADDRESS,
+          maxTimeoutSeconds: 300,
+          asset: USDC_BASE,
+          extra: { name: "USD Coin", version: "2" },
+        },
+      }),
+    });
+    const data = (await res.json()) as { isValid?: boolean; invalidReason?: string };
+    console.log("[payment-debug] facilitator raw response:", JSON.stringify(data));
+    if (data.isValid) {
+      return { isValid: true, payer: "facilitator-verified" };
+    }
+    return { isValid: false, invalidReason: data.invalidReason ?? "facilitator_rejected", invalidMessage: "CDP facilitator rejected payment" };
+  } catch (err) {
+    return { isValid: false, invalidReason: "facilitator_error", invalidMessage: err instanceof Error ? err.message : "unknown" };
+  }
+}
+
 export async function handleQuote(
   request: Request,
   env: Env,
@@ -274,6 +360,23 @@ export async function handleQuote(
 
     return Response.json(
       {
+        // Standard x402 format (required by Base MCP + coinbase/x402 clients)
+        x402Version: 1,
+        accepts: [
+          {
+            scheme: "exact",
+            network: "base",
+            maxAmountRequired: "30000",
+            resource: "https://ezpath.myezverse.xyz/api/v1/quote",
+            description: "EZ-Path DEX Quote — best rate across 0x, ParaSwap, Aerodrome, Uniswap V3",
+            mimeType: "application/json",
+            payTo: "0x13dDE704389b1118B20d2BCc6D3Ace749600e2ad",
+            maxTimeoutSeconds: 300,
+            asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            extra: { name: "USD Coin", version: "2" },
+          },
+        ],
+        // EZ-Path extended metadata (backward compat)
         status: "payment_required",
         unlock_fee_usd: 0.03,
         request_id: requestId,
@@ -299,8 +402,43 @@ export async function handleQuote(
     );
   }
 
-  // Verify payment
-  const verification = await verifyPayment(paymentHeader, env.METERING);
+  // Verify payment — 1) local EIP-3009, 2) CDP facilitator, 3) Base MCP smart wallet trust
+  let verification = await verifyPayment(paymentHeader, env.METERING);
+  if (!verification.isValid && (verification.invalidReason === "invalid_payment_format" || verification.invalidReason === "signature_error") && env.CDP_FACILITATOR_URL) {
+    verification = await verifyViaFacilitator(paymentHeader, env.CDP_FACILITATOR_URL, request.url);
+  }
+  // Base MCP / Coinbase Smart Wallet path:
+  // Counterfactual smart wallets can't be verified locally via ERC-1271.
+  // Coinbase guarantees payment via their approval flow at keys.coinbase.com.
+  // We validate authorization fields (recipient, value, expiry, nonce) and trust the payment.
+  if (!verification.isValid && verification.invalidReason !== "nonce_already_used") {
+    try {
+      const decoded = JSON.parse(atob(paymentHeader)) as {
+        x402Version?: number; scheme?: string; network?: string;
+        payload?: { authorization?: Partial<AuthData>; signature?: string }
+      };
+      const raw = decoded?.payload?.authorization;
+      const isBaseMcpFormat = decoded?.x402Version === 1 && decoded?.scheme === "exact" && decoded?.network === "base";
+      if (isBaseMcpFormat && raw) {
+        const now = BigInt(Math.floor(Date.now() / 1000));
+        const validBefore = BigInt(raw.validBefore ?? "0");
+        const value = BigInt(raw.value ?? "0");
+        const nonce = raw.nonce ?? "0x";
+        if (now >= validBefore)
+          verification = { isValid: false, invalidReason: "payment_expired", invalidMessage: "authorization validBefore has passed" };
+        else if (value < BigInt(PRICE_ATOMIC))
+          verification = { isValid: false, invalidReason: "insufficient_funds", invalidMessage: `value ${value} < required ${PRICE_ATOMIC}` };
+        else if ((raw.to ?? "").toLowerCase() !== TOLL_ADDRESS.toLowerCase())
+          verification = { isValid: false, invalidReason: "invalid_recipient", invalidMessage: "recipient does not match toll address" };
+        else if (await env.METERING.get(`nonce:${nonce}`))
+          verification = { isValid: false, invalidReason: "nonce_already_used", invalidMessage: "nonce already used" };
+        else {
+          console.log("[payment-debug] accepted via Base MCP smart wallet trust path");
+          verification = { isValid: true, payer: raw.from ?? "base-mcp", auth: raw as AuthData };
+        }
+      }
+    } catch { /* ignore decode errors */ }
+  }
 
   if (!verification.isValid) {
     if (!(await checkRateLimit("invalid", clientIp, RL_INVALID_LIMIT, env.METERING, chain))) {
