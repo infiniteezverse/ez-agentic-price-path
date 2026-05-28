@@ -4,15 +4,15 @@ export const LANDING_HTML = `<!DOCTYPE html>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EZ-Path — DEX Meta-Router on Base</title>
-  <meta name="description" content="Pay-per-request DEX meta-router on Base mainnet. Races 0x, ParaSwap, Aerodrome, and Uniswap V3 to return the best swap quote. No API key. No subscription." />
+  <meta name="description" content="Pay-per-request DEX meta-router on Base mainnet. Races 10 venues simultaneously to return the best swap quote. No API key. No subscription." />
   <meta property="og:type"        content="website" />
   <meta property="og:url"         content="https://ezpath.myezverse.xyz/" />
   <meta property="og:title"       content="EZ-Path — DEX Meta-Router on Base" />
-  <meta property="og:description" content="Pay-per-request DEX meta-router on Base mainnet. Races 0x, ParaSwap, Aerodrome, and Uniswap V3. No API key. No subscription." />
+  <meta property="og:description" content="Pay-per-request DEX meta-router on Base mainnet. Races 10 venues simultaneously. No API key. No subscription." />
   <meta property="og:image"       content="https://ezpath.myezverse.xyz/og.webp" />
   <meta name="twitter:card"        content="summary_large_image" />
   <meta name="twitter:title"       content="EZ-Path — DEX Meta-Router on Base" />
-  <meta name="twitter:description" content="Pay-per-request DEX meta-router on Base mainnet. Races 0x, ParaSwap, Aerodrome, and Uniswap V3. No API key. No subscription." />
+  <meta name="twitter:description" content="Pay-per-request DEX meta-router on Base mainnet. Races 10 venues simultaneously. No API key. No subscription." />
   <meta name="twitter:image"       content="https://ezpath.myezverse.xyz/og.webp" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -154,7 +154,7 @@ export const LANDING_HTML = `<!DOCTYPE html>
 
   <div class="badge"><span class="dot"></span> Live · Base Mainnet</div>
   <h1>EZ-Path</h1>
-  <p class="tagline">Pay-per-request DEX meta-router. Races 0x, ParaSwap, Aerodrome &amp; Uniswap V3. Best route wins. No subscription. No API key.</p>
+  <p class="tagline">Pay-per-request DEX meta-router. Races 10 venues simultaneously. Best route wins. No subscription. No API key.</p>
 
   <div class="price-row">
     <div class="price-pill">from 0.03 USDC / request</div>
@@ -197,7 +197,7 @@ export const LANDING_HTML = `<!DOCTYPE html>
   <div class="caps">
     <div class="cap">
       <div class="cap-id">price_quote</div>
-      <div class="cap-desc">Best available swap quote for any Base ERC-20 pair. Races 0x, ParaSwap, Aerodrome, and Uniswap V3 — returns highest buyAmount. Three tiers: basic ($0.03), resilient ($0.10), institutional ($0.50).</div>
+      <div class="cap-desc">Best available swap quote for any Base ERC-20 pair. Races 10 venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) — returns highest buyAmount. Three tiers: basic ($0.03), resilient ($0.10), institutional ($0.50).</div>
     </div>
   </div>
 

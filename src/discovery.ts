@@ -96,7 +96,7 @@ export const BITTE_AI_PLUGIN_JSON = {
   openapi: "3.1.0",
   info: {
     title: "EZ-Path DEX Router",
-    description: "Pay-per-request DEX meta-router on Base mainnet. Races 0x, ParaSwap, Aerodrome, and Uniswap V3. Best swap quote for any ERC-20 pair. Pay 0.03 USDC per request via X402.",
+    description: "Pay-per-request DEX meta-router on Base mainnet. Races 10 venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix). Best swap quote for any ERC-20 pair. Pay 0.03 USDC per request via X402.",
     version: "1.0.0",
   },
   servers: [{ url: "https://ezpath.myezverse.xyz" }],
@@ -104,7 +104,7 @@ export const BITTE_AI_PLUGIN_JSON = {
     "account-id": "92f6ac4fff24ebf39dbc0759fc84e018f8f84bcb020c7ded12500e01e11fa938",
     assistant: {
       name: "EZ-Path",
-      description: "DEX meta-router on Base. Races 0x, ParaSwap, Aerodrome & Uniswap V3. Returns best swap quote. Pay 0.03 USDC per request via X402 — no API key needed.",
+      description: "DEX meta-router on Base. Races 10 venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix). Returns best swap quote. Pay 0.03 USDC per request via X402 — no API key needed.",
       instructions: "You are EZ-Path, a DEX meta-router on Base mainnet. When a user wants a swap quote, call getQuote with sellToken, buyToken, and sellAmount in base decimals. USDC address: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 (6 decimals). WETH address: 0x4200000000000000000000000000000000000006 (18 decimals). Each call requires 0.03 USDC payment via X402 EIP-3009.",
       tools: [{ type: "function" }],
       image: "https://ezpath.myezverse.xyz/og.webp",
@@ -350,7 +350,7 @@ export const EZPATH_MANIFEST_JSONLD = {
         "@type": "Offer",
         name: "Resilient Tier",
         price: "0.10",
-        description: "4-venue concurrent race (0x, ParaSwap, Aerodrome, Curve). Latency: <300ms. Higher quality execution.",
+        description: "10-venue concurrent race (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix). Latency: <300ms. Higher quality execution.",
       },
       {
         "@type": "Offer",

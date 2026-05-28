@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.infiniteezverse/mcp-ezpath",
-  "description": "Base DEX meta-router. Races 0x, ParaSwap, Aerodrome & Uniswap V3. Best quote. X402 pay-per-use.",
+  "description": "Base DEX meta-router. Races 10 venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix). Best quote. X402 pay-per-use.",
   "version": "0.1.1",
   "packages": [
     {

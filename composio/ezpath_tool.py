@@ -93,7 +93,7 @@ class EZPathQuoteInput(BaseModel):
 def ezpath_quote(request: EZPathQuoteInput) -> dict:
     """
     Get the best DEX swap quote on Base mainnet.
-    Races 0x, ParaSwap, Aerodrome, and Uniswap V3 simultaneously.
+    Races 10 venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) simultaneously.
     Returns highest buyAmount. Payment ($0.03 USDC) handled automatically via X402.
 
     Common token addresses on Base:

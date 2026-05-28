@@ -68,7 +68,7 @@ const composio = new Composio({ apiKey: process.env.COMPOSIO_API_KEY });
 export const ezpathQuoteTool = await composio.tools.createCustomTool({
   slug:        "EZPATH_QUOTE",
   name:        "EZ-Path DEX Quote",
-  description: "Get the best DEX swap quote on Base mainnet. Races 0x, ParaSwap, Aerodrome, and Uniswap V3. Returns highest buyAmount. Costs $0.03 USDC per call, paid automatically. Common tokens — USDC: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913, WETH: 0x4200000000000000000000000000000000000006",
+  description: "Get the best DEX swap quote on Base mainnet. Races 10 venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) and returns the highest buyAmount. Costs $0.03 USDC per call, paid automatically. Common tokens — USDC: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913, WETH: 0x4200000000000000000000000000000000000006",
 
   inputParams: z.object({
     sell_token:          z.string().describe("ERC-20 token address to sell on Base mainnet"),

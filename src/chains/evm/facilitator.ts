@@ -30,7 +30,7 @@ export async function settleThroughFacilitator(
     network: "base",
     maxAmountRequired: auth.value,
     resource: "https://ezpath.myezverse.xyz/api/v1/quote",
-    description: "Best-execution DEX quote on Base - races 0x, ParaSwap, Aerodrome, and Uniswap V3 and returns the highest buyAmount.",
+    description: "Best-execution DEX quote on Base - races 10 venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) and returns the highest buyAmount.",
     mimeType: "application/json",
     payTo: tollAddress,
     maxTimeoutSeconds: 300,

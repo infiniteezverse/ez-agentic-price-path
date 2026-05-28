@@ -368,7 +368,7 @@ export async function handleQuote(
             network: "base",
             maxAmountRequired: String(PRICE_ATOMIC),
             resource: "https://ezpath.myezverse.xyz/api/v1/quote",
-            description: "EZ-Path DEX Quote — best rate across 0x, ParaSwap, Aerodrome, Uniswap V3",
+            description: "EZ-Path DEX Quote — races 10 venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) and returns the highest buyAmount",
             mimeType: "application/json",
             payTo: TOLL_ADDRESS,
             maxTimeoutSeconds: 300,

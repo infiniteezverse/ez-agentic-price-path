@@ -38,7 +38,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "ezpath_quote",
       description:
-        "Get the best DEX swap quote on Base mainnet by racing 0x, ParaSwap, Aerodrome, and Uniswap V3. Payment of $0.03 USDC per request via X402. Two payment paths: (1) set EZPATH_WALLET_KEY env var to a Base wallet private key with USDC balance for EIP-3009 signing; (2) use Base MCP's initiate_x402_request + complete_x402_request pointing at https://ezpath.myezverse.xyz/api/v1/quote — no wallet key required.",
+        "Get the best DEX swap quote on Base mainnet by racing 10 venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) and returning the highest buyAmount. Payment of $0.03 USDC per request via X402. Two payment paths: (1) set EZPATH_WALLET_KEY env var to a Base wallet private key with USDC balance for EIP-3009 signing; (2) use Base MCP's initiate_x402_request + complete_x402_request pointing at https://ezpath.myezverse.xyz/api/v1/quote — no wallet key required.",
       inputSchema: {
         type: "object",
         properties: {

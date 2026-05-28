@@ -236,7 +236,7 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
         ? [
             "EZ-Path DEX Meta-Router on Base mainnet.",
             "",
-            "I race 0x, ParaSwap, Aerodrome, and Uniswap V3 to return the best swap quote.",
+            "I race 10 venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) to return the best swap quote.",
             "Payment is per-request via X402 USDC (no API key, no subscription).",
             "",
             "Execution tiers:",
