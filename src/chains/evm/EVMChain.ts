@@ -380,7 +380,7 @@ export abstract class EVMChain implements IChain {
         auth,
         sig,
         facilitatorUrl,
-        "0x13dDE704389b1118B20d2BCc6D3Ace749600e2ad",
+        this.config.tollAddress ?? "0x13dDE704389b1118B20d2BCc6D3Ace749600e2ad",
         this.config.paymentToken,
         rawPayload,
       );

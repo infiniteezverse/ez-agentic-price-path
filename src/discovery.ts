@@ -121,7 +121,7 @@ export const OPENAPI_JSON = {
     title: "EZ-Path DEX Router",
     version: "1.0.0",
     description:
-      "X402-gated DEX price router on Base. Returns normalized quotes via 0x. Payment: 0.03 USDC per request via X402, sent in the X-Payment header.",
+      "X402-gated DEX meta-router on Base. Races 10 venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) and returns the highest buyAmount. Payment: 0.03 USDC per request via X402, sent in the X-Payment header.",
   },
   servers: [{ url: "https://ezpath.myezverse.xyz" }],
   paths: {
@@ -130,7 +130,7 @@ export const OPENAPI_JSON = {
         operationId: "getQuote",
         summary: "Get a normalized DEX price quote",
         description:
-          "Returns the best available price for a token swap on Base via 0x. Requires a valid X402 USDC payment in the X-Payment header (falls back to payment-signature for legacy clients). Returns 402 with payment instructions if the header is absent.",
+          "Returns the best available price for a token swap on Base by racing 10 venues simultaneously and returning the highest buyAmount. Requires a valid X402 USDC payment in the X-Payment header (falls back to payment-signature for legacy clients). Returns 402 with payment instructions if the header is absent.",
         parameters: [
           {
             name: "sellToken",

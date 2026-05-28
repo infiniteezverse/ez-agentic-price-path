@@ -370,13 +370,18 @@ export async function fetchCowSwapQuote(
   chainId: number,
 ): Promise<NormalizedQuote> {
   try {
-    const res = await fetch(`https://api.cow.fi/mainnet/api/v1/quote`, {
+    // CoW Swap requires chain-specific endpoint, from/receiver fields, and sellAmountBeforeFee
+    const network = chainId === 8453 ? "base" : chainId === 1 ? "mainnet" : "mainnet";
+    const res = await fetch(`https://api.cow.fi/${network}/api/v1/quote`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        sellToken, buyToken, sellAmount,
+        sellToken,
+        buyToken,
+        sellAmountBeforeFee: sellAmount,
         kind: "sell",
-        chainId: String(chainId),
+        from: "0x0000000000000000000000000000000000000001",
+        receiver: "0x0000000000000000000000000000000000000001",
       })
     });
     if (!res.ok) throw new Error(`cow_http_${res.status}`);

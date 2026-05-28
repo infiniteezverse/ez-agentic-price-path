@@ -8,6 +8,7 @@ export interface ChainConfig {
   rpcUrl: string;
   rpcUrls?: string[]; // fallback RPC URLs for settlement resilience
   paymentToken: string;
+  tollAddress?: string; // operator revenue address; falls back to hardcoded constant
   decimals: number;
   viemChain: any; // viem chain object (null for Solana)
   venues: string[];
@@ -96,7 +97,7 @@ export interface ExecutionRecord {
 
 export interface IChain {
   fetchQuote(params: QuoteParams): Promise<NormalizedQuote>;
-  settle(auth: any, sig: string): Promise<SettlementResult>;
+  settle(auth: any, sig: string | undefined, rawPayload?: unknown): Promise<SettlementResult>;
   recordMetrics(record: ExecutionRecord): Promise<void>;
   getConfig(): ChainConfig;
 }

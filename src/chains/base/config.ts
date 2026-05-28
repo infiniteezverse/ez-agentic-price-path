@@ -12,6 +12,7 @@ export const baseConfig: ChainConfig = {
     "https://1rpc.io/base",
   ],
   paymentToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // USDC
+  tollAddress: "0x13dDE704389b1118B20d2BCc6D3Ace749600e2ad",   // operator revenue
   decimals: 6,
   viemChain: base,
   venues: ["0x", "paraswap", "aerodrome", "uniswapv3"],
