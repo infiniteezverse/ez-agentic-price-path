@@ -252,25 +252,12 @@ export async function fetchUniswapV3Quote(
 // ─── Curve (Stablecoin optimized) ────────────────────────────────────
 
 export async function fetchCurveQuote(
-  sellToken: string,
-  buyToken: string,
-  sellAmount: string,
-  rpcUrl: string,
+  _sellToken: string,
+  _buyToken: string,
+  _sellAmount: string,
+  _rpcUrl: string,
 ): Promise<NormalizedQuote> {
-  try {
-    const res = await fetch(`https://api.curve.fi/v1/get_best_trade/${sellToken}/${buyToken}/${sellAmount}`, {
-      headers: { "accept": "application/json" }
-    });
-    if (!res.ok) throw new Error(`curve_http_${res.status}`);
-    const data = await res.json() as any;
-    return {
-      sellToken, buyToken, sellAmount,
-      buyAmount: data.best_trade?.amount_out?.toString() || "0",
-      sources: [{ name: "curve", proportion: "1" }],
-    };
-  } catch (e) {
-    throw new Error(`curve_quote_failed: ${e instanceof Error ? e.message : String(e)}`);
-  }
+  throw new Error("curve_unsupported: no REST quote API available for Base");
 }
 
 // ─── Balancer (Multi-pool DEX) ───────────────────────────────────────
@@ -279,34 +266,45 @@ export async function fetchBalancerQuote(
   sellToken: string,
   buyToken: string,
   sellAmount: string,
-  rpcUrl: string,
+  _rpcUrl: string,
 ): Promise<NormalizedQuote> {
-  try {
-    const res = await fetch("https://api.balancer.fi/graphql", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        query: `
-          query {
-            swaps(first: 1, where: { tokenIn: "${sellToken}" tokenOut: "${buyToken}" amountIn: "${sellAmount}" }) {
-              amountOut
-            }
-          }
-        `
-      })
-    });
-    const data = await res.json() as any;
-    const amountOut = data?.data?.swaps?.[0]?.amountOut || "0";
-    return {
-      sellToken, buyToken, sellAmount, buyAmount: amountOut,
-      sources: [{ name: "balancer", proportion: "1" }],
-    };
-  } catch (e) {
-    throw new Error(`balancer_quote_failed: ${e instanceof Error ? e.message : String(e)}`);
-  }
+  const res = await fetch("https://api.balancer.fi/sor/8453/v2/routes", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      tokenIn: sellToken,
+      tokenOut: buyToken,
+      swapAmount: sellAmount,
+      swapType: "EXACT_IN",
+    }),
+  });
+  if (!res.ok) throw new Error(`balancer_http_${res.status}: ${await res.text()}`);
+  const data = await res.json() as any;
+  const buyAmount = data?.returnAmount ?? data?.swapAmount ?? data?.routes?.[0]?.returnAmount;
+  if (!buyAmount || buyAmount === "0") throw new Error("balancer: zero or missing returnAmount");
+  return {
+    sellToken, buyToken, sellAmount, buyAmount: buyAmount.toString(),
+    sources: [{ name: "balancer", proportion: "1" }],
+  };
 }
 
 // ─── Uniswap V2 (Legacy but deep liquidity) ──────────────────────────
+
+const UNISWAP_V2_ROUTER_ABI = [
+  {
+    name: "getAmountsOut",
+    type: "function",
+    stateMutability: "view",
+    inputs: [
+      { name: "amountIn", type: "uint256" },
+      { name: "path", type: "address[]" },
+    ],
+    outputs: [{ name: "amounts", type: "uint256[]" }],
+  },
+] as const;
+
+const WETH_BASE = "0x4200000000000000000000000000000000000006";
+const UNISWAP_V2_ROUTER_BASE = "0x8909Dc15e40953b386FA8f445ea5F6a3d2313a1d";
 
 export async function fetchUniswapV2Quote(
   sellToken: string,
@@ -314,25 +312,42 @@ export async function fetchUniswapV2Quote(
   sellAmount: string,
   rpcUrl: string,
 ): Promise<NormalizedQuote> {
-  try {
-    const client = createPublicClient({ transport: http(rpcUrl) });
-    const UNISWAP_V2_ROUTER = "0x8909Dc15e40953b386FA8f445ea5F6a3d2313a1d"; // Base Uniswap V2
+  const client = createPublicClient({ transport: http(rpcUrl) });
+  const sell = sellToken.toLowerCase();
+  const buy = buyToken.toLowerCase();
+  const weth = WETH_BASE.toLowerCase();
 
-    const res = await fetch(`https://api.uniswap.org/v1/quote?tokenInAddress=${sellToken}&tokenOutAddress=${buyToken}&amount=${sellAmount}&type=exactIn`, {
-      headers: { "x-api-key": "uniswap" }
-    });
+  // Try direct path first; fall back to sell→WETH→buy if neither token is WETH
+  const paths: `0x${string}`[][] = sell === weth || buy === weth
+    ? [[sellToken as `0x${string}`, buyToken as `0x${string}`]]
+    : [
+        [sellToken as `0x${string}`, buyToken as `0x${string}`],
+        [sellToken as `0x${string}`, WETH_BASE as `0x${string}`, buyToken as `0x${string}`],
+      ];
 
-    if (!res.ok) throw new Error(`uniswap_v2_http_${res.status}`);
-    const data = await res.json() as any;
+  const results = await Promise.allSettled(
+    paths.map(path =>
+      client.readContract({
+        address: UNISWAP_V2_ROUTER_BASE as `0x${string}`,
+        abi: UNISWAP_V2_ROUTER_ABI,
+        functionName: "getAmountsOut",
+        args: [BigInt(sellAmount), path],
+      }).then(amounts => ({ amounts: amounts as readonly bigint[], path }))
+    )
+  );
 
-    return {
-      sellToken, buyToken, sellAmount,
-      buyAmount: data?.quote || "0",
-      sources: [{ name: "uniswap_v2", proportion: "1" }],
-    };
-  } catch (e) {
-    throw new Error(`uniswap_v2_quote_failed: ${e instanceof Error ? e.message : String(e)}`);
+  let bestAmount = 0n;
+  for (const r of results) {
+    if (r.status === "fulfilled") {
+      const out = r.value.amounts[r.value.amounts.length - 1];
+      if (out > bestAmount) bestAmount = out;
+    }
   }
+  if (bestAmount === 0n) throw new Error("uniswap_v2: no pool found or zero output");
+  return {
+    sellToken, buyToken, sellAmount, buyAmount: bestAmount.toString(),
+    sources: [{ name: "UniswapV2", proportion: "1" }],
+  };
 }
 
 // ─── 1Inch Aggregator (50+ DEX sources) ──────────────────────────────
@@ -343,22 +358,22 @@ export async function fetchOneInchQuote(
   sellAmount: string,
   chainId: number,
 ): Promise<NormalizedQuote> {
-  try {
-    const res = await fetch(
-      `https://api.1inch.io/v5.0/${chainId}/quote?fromTokenAddress=${sellToken}&toTokenAddress=${buyToken}&amount=${sellAmount}`,
-      { headers: { "accept": "application/json" } }
-    );
-    if (!res.ok) throw new Error(`1inch_http_${res.status}`);
-    const data = await res.json() as any;
-
-    return {
-      sellToken, buyToken, sellAmount,
-      buyAmount: data?.toTokenAmount || "0",
-      sources: data?.protocols?.map((p: any) => ({ name: p[0]?.[0]?.name || "unknown", proportion: "auto" })) || [{ name: "1inch", proportion: "1" }],
-    };
-  } catch (e) {
-    throw new Error(`1inch_quote_failed: ${e instanceof Error ? e.message : String(e)}`);
-  }
+  const params = new URLSearchParams({
+    fromTokenAddress: sellToken,
+    toTokenAddress: buyToken,
+    amount: sellAmount,
+  });
+  const res = await fetch(
+    `https://api.1inch.dev/swap/v5.2/${chainId}/quote?${params}`,
+    { headers: { "accept": "application/json" } },
+  );
+  if (!res.ok) throw new Error(`1inch_http_${res.status}: ${await res.text()}`);
+  const data = await res.json() as any;
+  return {
+    sellToken, buyToken, sellAmount,
+    buyAmount: data?.toTokenAmount || "0",
+    sources: data?.protocols?.map((p: any) => ({ name: p[0]?.[0]?.name || "unknown", proportion: "auto" })) || [{ name: "1inch", proportion: "1" }],
+  };
 }
 
 // ─── CoW Swap (Batch auction AMM) ────────────────────────────────────
@@ -400,30 +415,10 @@ export async function fetchCowSwapQuote(
 // ─── Synthetix (Synthetic asset swaps) ───────────────────────────────
 
 export async function fetchSynthetixQuote(
-  sellToken: string,
-  buyToken: string,
-  sellAmount: string,
-  rpcUrl: string,
+  _sellToken: string,
+  _buyToken: string,
+  _sellAmount: string,
+  _rpcUrl: string,
 ): Promise<NormalizedQuote> {
-  try {
-    const res = await fetch(`https://api.synthetix.io/v1/quote`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        fromToken: sellToken,
-        toToken: buyToken,
-        amount: sellAmount,
-      })
-    });
-    if (!res.ok) throw new Error(`synthetix_http_${res.status}`);
-    const data = await res.json() as any;
-
-    return {
-      sellToken, buyToken, sellAmount,
-      buyAmount: data?.outputAmount || "0",
-      sources: [{ name: "synthetix", proportion: "1" }],
-    };
-  } catch (e) {
-    throw new Error(`synthetix_quote_failed: ${e instanceof Error ? e.message : String(e)}`);
-  }
+  throw new Error("synthetix_unsupported_base: Synthetix V3 on Base has no REST swap quote API");
 }
