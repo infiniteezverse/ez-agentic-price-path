@@ -365,7 +365,7 @@ export abstract class EVMChain implements IChain {
     };
   }
 
-  async settle(auth: AuthData, sig: string): Promise<SettlementResult> {
+  async settle(auth: AuthData, sig: string | undefined, rawPayload?: unknown): Promise<SettlementResult> {
     let settlementTx: string | null = null;
     const facilitatorUrl = this.env.CDP_FACILITATOR_URL ?? "https://x402.org/facilitator";
 
@@ -376,8 +376,9 @@ export abstract class EVMChain implements IChain {
         auth,
         sig,
         facilitatorUrl,
-        "0x13dDE704389b1118B20d2BCc6D3Ace749600e2ad", // toll address (hardcoded for now)
+        "0x13dDE704389b1118B20d2BCc6D3Ace749600e2ad",
         this.config.paymentToken,
+        rawPayload, // pass full Base MCP payload for facilitator settlement
       );
       facilitatorSucceeded = true;
       const ttl = Math.max(1, Number(BigInt(auth.validBefore) - BigInt(Math.floor(Date.now() / 1000))));

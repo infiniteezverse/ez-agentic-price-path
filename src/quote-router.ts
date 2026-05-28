@@ -74,7 +74,8 @@ type VerifyResult =
       isValid: true;
       payer: string;
       auth: AuthData;
-      sig: string;
+      sig?: string;
+      rawPayload?: unknown; // full decoded x402 payment object for Base MCP settlement
     };
 
 const PRICE_ATOMIC = "30000"; // 0.03 USDC
@@ -432,7 +433,7 @@ export async function handleQuote(
         else if (await env.METERING.get(`nonce:${nonce}`))
           verification = { isValid: false, invalidReason: "nonce_already_used", invalidMessage: "nonce already used" };
         else {
-          verification = { isValid: true, payer: raw.from ?? "base-mcp", auth: raw as AuthData };
+          verification = { isValid: true, payer: raw.from ?? "base-mcp", auth: raw as AuthData, rawPayload: decoded };
         }
       }
     } catch { /* ignore decode errors */ }
@@ -508,7 +509,7 @@ export async function handleQuote(
     ctx.waitUntil(
       (async () => {
         try {
-          await chainImpl.settle(verification.auth, verification.sig);
+          await chainImpl.settle(verification.auth, verification.sig, verification.rawPayload);
         } catch (settlementErr) {
           console.error(
             `[async-settlement] failed: ${settlementErr instanceof Error ? settlementErr.message : settlementErr}`
@@ -537,7 +538,6 @@ export async function handleQuote(
         status: 200,
         headers: {
           "X-Routing-Engine": routingMetadata?.winner ?? quote.sources[0]?.name ?? "0x",
-          "X-Settlement-Tx": "0x" + crypto.randomUUID().replace(/-/g, "").slice(0, 64),
           "EXTENSION-RESPONSES": btoa(JSON.stringify({ bazaar: { acknowledged: true, settled: true } })),
         },
       }

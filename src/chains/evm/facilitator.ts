@@ -12,12 +12,14 @@ export interface AuthData {
 
 export async function settleThroughFacilitator(
   auth: AuthData,
-  sig: string,
+  sig: string | undefined,
   facilitatorUrl: string,
   tollAddress: string,
   paymentToken: string,
+  rawPayload?: unknown, // full decoded x402 payment (Base MCP / Smart Wallet)
 ): Promise<string | null> {
-  const paymentPayload = {
+  // Use raw payload if provided (Base MCP path), otherwise reconstruct from EIP-3009 fields
+  const paymentPayload = rawPayload ?? {
     x402Version: 1,
     scheme: "exact",
     network: "base",
