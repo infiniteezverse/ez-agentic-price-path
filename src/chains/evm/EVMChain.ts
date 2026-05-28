@@ -368,6 +368,10 @@ export abstract class EVMChain implements IChain {
   async settle(auth: AuthData, sig: string | undefined, rawPayload?: unknown): Promise<SettlementResult> {
     let settlementTx: string | null = null;
     const facilitatorUrl = this.env.CDP_FACILITATOR_URL ?? "https://x402.org/facilitator";
+    const ttl = Math.max(1, Number(BigInt(auth.validBefore) - BigInt(Math.floor(Date.now() / 1000))));
+
+    // Mark nonce as pending BEFORE attempting settlement to prevent replay attacks
+    await this.kv.put(`nonce:${auth.nonce}`, "pending", { expirationTtl: ttl });
 
     // Try facilitator first (Bazaar indexing)
     let facilitatorSucceeded = false;
@@ -378,12 +382,11 @@ export abstract class EVMChain implements IChain {
         facilitatorUrl,
         "0x13dDE704389b1118B20d2BCc6D3Ace749600e2ad",
         this.config.paymentToken,
-        rawPayload, // pass full Base MCP payload for facilitator settlement
+        rawPayload,
       );
       facilitatorSucceeded = true;
-      const ttl = Math.max(1, Number(BigInt(auth.validBefore) - BigInt(Math.floor(Date.now() / 1000))));
+      // Upgrade nonce record to actual tx hash
       await this.kv.put(`nonce:${auth.nonce}`, settlementTx ?? "facilitator", { expirationTtl: ttl });
-      console.log(`[settlement] facilitator tx=${settlementTx} payer=${auth.from}`);
     } catch (facilitatorErr) {
       console.error(
         `[settlement] facilitator failed (${facilitatorErr instanceof Error ? facilitatorErr.message : facilitatorErr}), falling back to relayer`
@@ -394,7 +397,7 @@ export abstract class EVMChain implements IChain {
       try {
         settlementTx = await this.settlePayment(auth, sig);
       } catch (err) {
-        console.error(`[settlement] FAILED payer=${auth.from} nonce=${auth.nonce} error=${err instanceof Error ? err.message : err}`);
+        console.error(`[settlement] FAILED payer=${auth.from.slice(0, 10)}... error=${err instanceof Error ? err.message : err}`);
         return { txHash: null, status: "failed", errorCode: "settlement_failed" };
       }
     }
@@ -402,7 +405,9 @@ export abstract class EVMChain implements IChain {
     return { txHash: settlementTx, status: "success" };
   }
 
-  private async settlePayment(auth: AuthData, sig: string): Promise<string | null> {
+  private async settlePayment(auth: AuthData, sig: string | undefined): Promise<string | null> {
+    // Guard: Base MCP path has no standard ECDSA sig — skip relayer settlement
+    if (!sig || sig.length < 132) return null;
     if (!this.env.RELAYER_PRIVATE_KEY) return null;
 
     const r = sig.slice(0, 66) as `0x${string}`;
