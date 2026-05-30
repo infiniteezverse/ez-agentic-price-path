@@ -5,7 +5,7 @@ export const LLMS_MD = `# EZ-Path
 
 ## What It Does
 
-EZ-Path races multiple liquidity sources in parallel and returns the best swap quote for any ERC-20 pair on Base. Agents pay exactly what they use — nothing more.
+EZ-Path races 10 venues in parallel (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) and returns the highest buyAmount for any ERC-20 pair on Base. Agents pay exactly what they use — nothing more.
 
 ## Payment
 

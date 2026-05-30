@@ -40,6 +40,7 @@
 import { verifyTypedData, hashTypedData, toBytes, toHex } from "viem";
 import { createChainRegistry, getChain } from "./chains/registry";
 import { type SupportedChain } from "./chains/types";
+import { tokenDecimals } from "./chains/evm/venues";
 
 // Re-export for convenience
 export type { SupportedChain };
@@ -462,6 +463,7 @@ export async function handleQuote(
   // Payment verified - fetch real quote from chain
   const now = Date.now();
   const expiresAt = now + (EXECUTION_TTL_SECONDS * 1000);
+  const quoteStart = Date.now();
 
   try {
     // Create chain registry and get the appropriate chain implementation
@@ -503,18 +505,60 @@ export async function handleQuote(
       });
     }
 
+    const totalLatencyMs = Date.now() - quoteStart;
     const price = calculatePrice(quote.buyAmount, buyToken!, sellAmount!, sellToken!);
+    const feeAtomic = Number(verification.auth.value);
+    const winner = routingMetadata?.winner ?? quote.sources[0]?.name ?? "0x";
 
-    // Trigger settlement async (non-blocking) - facilitator or relayer will settle
+    // Trigger settlement + metrics async (non-blocking)
     ctx.waitUntil(
       (async () => {
+        let settlementResult = { txHash: null as string | null, status: "failed" as const, errorCode: "not_attempted" };
         try {
-          await chainImpl.settle(verification.auth, verification.sig, verification.rawPayload);
+          settlementResult = await chainImpl.settle(verification.auth, verification.sig, (verification as any).rawPayload) as any;
         } catch (settlementErr) {
           console.error(
             `[async-settlement] failed: ${settlementErr instanceof Error ? settlementErr.message : settlementErr}`
           );
-          // Non-fatal: settlement may occur via fallback paths
+        }
+
+        // Record metrics to KV (ETL pipeline reads these nightly)
+        try {
+          await chainImpl.recordMetrics({
+            requestId,
+            timestamp: now,
+            chain,
+            payer,
+            tier,
+            feeCollected: {
+              atomic: feeAtomic,
+              usdValue: `$${(feeAtomic / 1_000_000).toFixed(6)}`,
+            },
+            execution: {
+              mode: routingMetadata?.execution_mode ?? "direct",
+              winner,
+              buyAmount: quote.buyAmount,
+            },
+            venues: quote.sources.map((s: any) => ({
+              name: s.name,
+              latencyMs: totalLatencyMs,
+              buyAmount: quote.buyAmount,
+              success: true,
+            })),
+            edgeBps: 0,
+            totalLatencyMs,
+            auth: { verificationStatus: "valid" },
+            settlement: {
+              attempted: true,
+              status: settlementResult.status ?? "failed",
+              txHash: settlementResult.txHash ?? undefined,
+              errorCode: settlementResult.errorCode,
+            },
+            rateLimitStatus: { category: "paid", allowed: true },
+            fallbackUsed: false,
+          });
+        } catch (metricsErr) {
+          console.error(`[metrics] failed: ${metricsErr instanceof Error ? metricsErr.message : metricsErr}`);
         }
       })()
     );
@@ -561,8 +605,19 @@ export async function handleQuote(
 }
 
 function calculatePrice(buyAmount: string, buyAddr: string, sellAmount: string, sellAddr: string): string {
-  if (sellAmount === "0") return "0";
-  const buyNum = BigInt(buyAmount);
-  const sellNum = BigInt(sellAmount);
-  return (Number(buyNum) / Number(sellNum)).toFixed(18);
+  if (sellAmount === "0" || buyAmount === "0") return "0";
+  // Decimal-adjust: express as (buyToken human units) / (sellToken human units)
+  // = (buyAmount / 10^buyDec) / (sellAmount / 10^sellDec)
+  // = (buyAmount * 10^sellDec) / (sellAmount * 10^buyDec)
+  const buyDec = tokenDecimals(buyAddr);
+  const sellDec = tokenDecimals(sellAddr);
+  const scale = 10n ** 18n; // keep 18 decimal precision in integer math
+  const numerator = BigInt(buyAmount) * (10n ** BigInt(sellDec)) * scale;
+  const denominator = BigInt(sellAmount) * (10n ** BigInt(buyDec));
+  if (denominator === 0n) return "0";
+  const result = numerator / denominator;
+  // Format as decimal string with 18 decimal places
+  const intPart = result / scale;
+  const fracPart = result % scale;
+  return `${intPart}.${fracPart.toString().padStart(18, "0")}`;
 }

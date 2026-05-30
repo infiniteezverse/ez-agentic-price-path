@@ -515,7 +515,7 @@ export abstract class EVMChain implements IChain {
       v.success_rate = v.request_count > 0 ? (v.success_count / v.request_count) * 100 : 0;
     }
 
-    await this.kv.put(operatorKey, JSON.stringify(operatorData), { expirationTtl: 86400 });
+    await this.kv.put(operatorKey, JSON.stringify(operatorData), { expirationTtl: 172800 });
 
     // ── Venue-Level Metrics ──
     for (const venue of record.venues) {
@@ -537,7 +537,7 @@ export abstract class EVMChain implements IChain {
       venueData.win_rate = venueData.request_count > 0 ? (venueData.win_count / venueData.request_count) * 100 : 0;
       venueData.success_rate = venueData.request_count > 0 ? (venueData.success_count / venueData.request_count) * 100 : 0;
 
-      await this.kv.put(venueKey, JSON.stringify(venueData), { expirationTtl: 86400 });
+      await this.kv.put(venueKey, JSON.stringify(venueData), { expirationTtl: 172800 });
     }
 
     // ── Agent Metrics (payer-scoped) ──
@@ -566,7 +566,7 @@ export abstract class EVMChain implements IChain {
     agentData.avg_edge_bps = agentData.request_count > 0 ? agentData.edge_bps_sum / agentData.request_count : 0;
     agentData.success_rate = agentData.request_count > 0 ? (agentData.success_count / agentData.request_count) * 100 : 0;
 
-    await this.kv.put(agentKey, JSON.stringify(agentData), { expirationTtl: 86400 });
+    await this.kv.put(agentKey, JSON.stringify(agentData), { expirationTtl: 172800 });
 
     // ── Fallback Log ──
     if (record.fallbackUsed) {
@@ -585,7 +585,7 @@ export abstract class EVMChain implements IChain {
 
       fallbackData.avg_extra_latency_ms = fallbackData.total_fallback_events > 0 ? fallbackData.extra_latency_sum_ms / fallbackData.total_fallback_events : 0;
 
-      await this.kv.put(fallbackKey, JSON.stringify(fallbackData), { expirationTtl: 86400 });
+      await this.kv.put(fallbackKey, JSON.stringify(fallbackData), { expirationTtl: 172800 });
     }
 
     // ── Supabase Cold Storage (async, non-blocking) ──

@@ -35,7 +35,7 @@ export const WELL_KNOWN_AGENT_JSON = {
     tiers: {
       basic:         { price_usd: 0.03, price_atomic: "30000",  description: "Direct 0x execution — fast, simple routing" },
       resilient:     { price_usd: 0.10, price_atomic: "100000", description: "4-venue concurrent race (0x, ParaSwap, Aerodrome, Curve) — best of mid-tier liquidity" },
-      institutional: { price_usd: 0.50, price_atomic: "500000", description: "All 10 venues in parallel (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) + Flashbots MEV protection — maximum execution quality and safety" },
+      institutional: { price_usd: 0.50, price_atomic: "500000", description: "All 10 venues in parallel (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) with early-termination — maximum execution quality" },
     },
   },
   contact: "contact@ezsecuretech.com",
@@ -47,9 +47,9 @@ export const AGENT_JSON = {
   name_for_model: "ezpath",
   name_for_human: "EZ-Path",
   description_for_model:
-    "EZ-Path is a pay-per-request DEX meta-router on Base with three pricing tiers. Basic (0.03 USDC): direct 0x routing. Resilient (0.10 USDC): races 4 venues (0x, ParaSwap, Aerodrome, Curve). Institutional (0.50 USDC): races all 10 venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) in parallel with Flashbots MEV protection. Call GET /api/v1/quote with sellToken, buyToken, sellAmount. 402 response lists tier minimums. Fund EIP-3009 auth to tier level, include signed payload in X-Payment header, retry. Response includes execution_mode (direct/concurrent_race), winner, and edge_bps vs runner-up.",
+    "EZ-Path is a pay-per-request DEX meta-router on Base with three pricing tiers. Basic (0.03 USDC): direct 0x routing. Resilient (0.10 USDC): races 4 venues concurrently (0x, ParaSwap, Curve, Aerodrome) and returns highest buyAmount. Institutional (0.50 USDC): races all 10 venues in parallel (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) with early-termination when a clear winner emerges. Call GET /api/v1/quote with sellToken, buyToken, sellAmount. 402 response lists tier minimums. Fund EIP-3009 auth to tier level, include signed payload in X-Payment header, retry. Response includes routingEngine (winner), tier, and price.",
   description_for_human:
-    "DEX meta-router racing 10 venues on Base with X402 payment. Get best execution: basic ($0.03), resilient ($0.10, 4-venue race), or institutional ($0.50, all 10 venues + MEV protection).",
+    "DEX meta-router racing 10 venues on Base with X402 payment. Get best execution: basic ($0.03), resilient ($0.10, 4-venue race), or institutional ($0.50, all 10 venues).",
   auth: {
     type: "x402",
     asset: "USDC",
@@ -73,14 +73,14 @@ export const AGENT_JSON = {
       min_atomic: "100000",
       price_usd: 0.10,
       execution_mode: "concurrent_race",
-      description: "Dual-lane concurrent race: 0x/ParaSwap aggregator stack vs Aerodrome on-chain read. Highest buyAmount wins. Recommended for trades $50–$1,000.",
+      description: "4-venue concurrent race: 0x, ParaSwap, Curve, and Aerodrome fire simultaneously. Highest buyAmount wins with early-termination at >150bps lead. Recommended for trades $50–$1,000.",
     },
     {
       tier: "institutional",
       min_atomic: "500000",
       price_usd: 0.50,
-      execution_mode: "concurrent_race + emergency_onchain_fallback",
-      description: "Dual-lane race plus Uniswap V3 triple-fee-tier on-chain safety net if both lanes fail. Zero-failure guarantee for heavy capital operations ($1,000+).",
+      execution_mode: "concurrent_race",
+      description: "All 10 venues in parallel (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) with early-termination at >75bps lead. Maximum execution quality for heavy capital operations ($1,000+).",
     },
   ],
   "x-why-agents-choose-us": [
@@ -356,7 +356,7 @@ export const EZPATH_MANIFEST_JSONLD = {
         "@type": "Offer",
         name: "Institutional Tier",
         price: "0.50",
-        description: "All 10 venues in parallel with MEV protection. Latency: <350ms. Maximum execution quality.",
+        description: "All 10 venues in parallel with early-termination. Latency: <350ms. Maximum execution quality.",
       },
     ],
   },

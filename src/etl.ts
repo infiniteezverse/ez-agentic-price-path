@@ -112,7 +112,7 @@ async function discoverKVKeys(
   let listCount = 0;
 
   while (true) {
-    const result = await METERING.list({ prefix: "", cursor, limit: 1000 });
+    const result = await METERING.list({ prefix: "metrics:", cursor, limit: 1000 });
     listCount += result.keys.length;
 
     for (const { name } of result.keys) {
