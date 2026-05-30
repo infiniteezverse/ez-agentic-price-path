@@ -11,7 +11,11 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test-x402": "node --loader tsx test-x402-payment.ts"
+    "test-x402": "node --loader tsx test-x402-payment.ts",
+    "test:unit": "node --import tsx/esm scripts/test-unit.ts",
+    "test:smoke": "node --import tsx/esm scripts/test-smoke.ts",
+    "test": "npm run test:unit && npm run test:smoke",
+    "predeploy": "npm run test:unit"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",
@@ -88,6 +92,7 @@
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^15.15.0",
     "prettier": "^3.7.3",
+    "tsx": "^4.22.3",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",
     "vite": "^7.3.1"

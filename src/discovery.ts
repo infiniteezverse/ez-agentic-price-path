@@ -1,14 +1,14 @@
 export const WELL_KNOWN_AGENT_JSON = {
   schema_version: "v2.0",
   name: "EZ-Path",
-  description: "Pay-per-request DEX meta-router on Base, Arbitrum, Optimism, and Polygon. Races 10 DEX venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) across all four chains and returns the highest buyAmount for any ERC-20 swap. Three execution tiers: basic ($0.03 direct), resilient ($0.10 4-venue race), institutional ($0.50 all-10-venue race + MEV protection). Payment via X402 EIP-3009 USDC — no API key, no subscription.",
+  description: "Pay-per-request DEX meta-router on Base, Arbitrum, Optimism, and Polygon. Races 10 DEX venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) across all four chains and returns the highest buyAmount for any ERC-20 swap. Three execution tiers: basic ($0.03 direct), resilient ($0.10 4-venue race), institutional ($0.50 all-10-venue race with early-termination). Payment via X402 EIP-3009 USDC — no API key, no subscription.",
   url: "https://ezpath.myezverse.xyz",
   x402_version: 1,
   capabilities: [
     {
       id: "price_quote",
       name: "DEX Price Quote",
-      description: "Returns the best available swap quote for any ERC-20 pair across Base, Arbitrum, Optimism, and Polygon by racing 10 DEX venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix). Includes price, buyAmount, sources, execution_mode, winner, and on-chain settlement_tx. Institutional tier includes MEV protection.",
+      description: "Returns the best available swap quote for any ERC-20 pair across Base, Arbitrum, Optimism, and Polygon by racing 10 DEX venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix). Includes price, buyAmount, sources, execution_mode, winner, and on-chain settlement_tx. Institutional tier races all 10 venues with early-termination.",
       endpoint: "https://ezpath.myezverse.xyz/api/v1/quote",
       method: "GET",
       parameters: [
