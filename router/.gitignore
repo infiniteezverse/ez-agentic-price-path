@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+.env.router
+.env.local
+*.log
+.DS_Store
+.wrangler/
+.claude/
