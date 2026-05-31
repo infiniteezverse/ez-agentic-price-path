@@ -1,0 +1,24 @@
+{
+  "name": "ez-path-treasury",
+  "version": "0.1.0",
+  "description": "EZ-Path LP Treasury Bot - Manages liquidity provision and tracks agent swaps on Aerodrome",
+  "type": "module",
+  "main": "dist/start.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/start.ts",
+    "monitor": "node dist/start.js",
+    "test": "tsx --test src/**/*.test.ts",
+    "types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "viem": "^2.49.3",
+    "ethers": "^6.13.0",
+    "axios": "^1.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.3",
+    "tsx": "^4.22.3"
+  }
+}
