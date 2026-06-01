@@ -4,7 +4,8 @@
  */
 
 import express, { Request, Response } from 'express';
-import { createPublicClient, createWalletClient, http, privateKeyToAccount } from 'viem';
+import { createPublicClient, createWalletClient, http } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
 import { base } from 'viem/chains';
 import { IntentListener } from './intent-listener';
 import { Settlement } from './settlement';
@@ -34,7 +35,7 @@ const walletClient = createWalletClient({
 });
 
 // Initialize services
-const intentListener = new IntentListener(solverConfig);
+const intentListener = new IntentListener(solverConfig, publicClient);
 const settlement = new Settlement(publicClient, walletClient, solverConfig);
 
 // State
@@ -58,9 +59,29 @@ let solverState: SolverState = {
   },
 };
 
+// Route cache: Map<intentId, routes[]>
+const routeCache = new Map<string, any[]>();
+
 // Express app
 const app = express();
 app.use(express.json());
+
+/**
+ * Helper to serialize BigInt for JSON responses
+ */
+function serializeBigInt(obj: any): any {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === 'bigint') return obj.toString();
+  if (Array.isArray(obj)) return obj.map(serializeBigInt);
+  if (typeof obj === 'object') {
+    const result: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = serializeBigInt(value);
+    }
+    return result;
+  }
+  return obj;
+}
 
 /**
  * POST /solver/submit-intent
@@ -78,12 +99,13 @@ app.post('/solver/submit-intent', async (req: Request, res: Response) => {
     }
 
     // Create intent
+    const sellAmountBigInt = BigInt(sellAmount);
     const intent: SwapIntent = {
       id: `intent-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       sellToken,
       buyToken,
-      sellAmount: BigInt(sellAmount),
-      minBuyAmount: BigInt(minBuyAmount || sellAmount / 2n),
+      sellAmount: sellAmountBigInt,
+      minBuyAmount: minBuyAmount ? BigInt(minBuyAmount) : sellAmountBigInt / 2n,
       deadline: Math.floor(Date.now() / 1000) + 3600,  // 1h from now
       nonce: Math.random().toString(36).slice(2),
       chain,
@@ -103,12 +125,15 @@ app.post('/solver/submit-intent', async (req: Request, res: Response) => {
       });
     }
 
-    return res.status(200).json({
+    // Cache routes for execution
+    routeCache.set(intent.id, routes);
+
+    return res.status(200).json(serializeBigInt({
       intentId: intent.id,
       routes,
       bestRoute: routes[0],
       message: `Got ${routes.length} routes, best is ${routes[0].source}`,
-    });
+    }));
   } catch (error) {
     console.error('Submit intent error:', error);
     return res.status(500).json({
@@ -143,9 +168,15 @@ app.post('/solver/execute', async (req: Request, res: Response) => {
 
     console.log(`\n🚀 Executing intent ${intentId} with route ${routeId}`);
 
-    // TODO: Get route from cache (currently not stored)
-    // For now, re-query routes
-    const routes = await intentListener.submitIntent(intent);
+    // Get routes from cache
+    let routes = routeCache.get(intentId);
+    if (!routes) {
+      // Fallback: re-query if cache miss (shouldn't happen in normal flow)
+      console.log('   ⚠️  Route cache miss, re-querying...');
+      routes = await intentListener.submitIntent(intent);
+      routeCache.set(intentId, routes);
+    }
+
     const route = routes.find((r) => r.routeId === routeId);
 
     if (!route) {
@@ -178,10 +209,10 @@ app.post('/solver/execute', async (req: Request, res: Response) => {
     // Remove from active
     solverState.activeIntents.delete(intentId);
 
-    return res.status(200).json({
+    return res.status(200).json(serializeBigInt({
       result,
       message: result.status === 'success' ? '✅ Executed successfully' : '❌ Execution failed',
-    });
+    }));
   } catch (error) {
     console.error('Execute error:', error);
     return res.status(500).json({
