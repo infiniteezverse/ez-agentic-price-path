@@ -563,6 +563,102 @@ export async function handleQuote(
       })()
     );
 
+    // Bazaar discovery metadata (indexed by CDP Facilitator)
+    const discoveryMetadata = {
+      endpoint: "https://ezpath.myezverse.xyz/api/v1/quote",
+      method: "GET",
+      input: {
+        sellToken: quote.sellToken,
+        buyToken: quote.buyToken,
+        sellAmount: quote.sellAmount,
+      },
+      inputSchema: {
+        type: "object",
+        properties: {
+          chain: {
+            type: "string",
+            description: "Blockchain network (base, arbitrum, optimism, polygon, solana)",
+            enum: ["base", "arbitrum", "optimism", "polygon", "solana"],
+          },
+          sellToken: {
+            type: "string",
+            description: "ERC-20 token address to sell (must be on specified chain)",
+            pattern: "^0x[a-fA-F0-9]{40}$",
+          },
+          buyToken: {
+            type: "string",
+            description: "ERC-20 token address to buy (must be on specified chain)",
+            pattern: "^0x[a-fA-F0-9]{40}$",
+          },
+          sellAmount: {
+            type: "string",
+            description: "Amount in atomic units (e.g., 1000000 for 1 USDC on 6-decimal chain)",
+          },
+          slippagePercentage: {
+            type: "string",
+            description: "Max slippage tolerance as percentage (optional, default 0.5%)",
+          },
+        },
+        required: ["sellToken", "buyToken", "sellAmount"],
+      },
+      output: {
+        example: {
+          status: "ok",
+          request_id: requestId,
+          sellToken: quote.sellToken,
+          buyToken: quote.buyToken,
+          sellAmount: quote.sellAmount,
+          buyAmount: quote.buyAmount,
+          price: price,
+          sources: quote.sources.map(s => s.name),
+          routingEngine: routingMetadata?.winner ?? "0x",
+          tier: tier,
+          expiresAt: expiresAt,
+        },
+        schema: {
+          type: "object",
+          properties: {
+            status: {
+              type: "string",
+              enum: ["ok"],
+              description: "Quote status",
+            },
+            request_id: {
+              type: "string",
+              description: "Unique request identifier",
+            },
+            buyAmount: {
+              type: "string",
+              description: "Expected output amount in atomic units",
+            },
+            price: {
+              type: "string",
+              description: "Human-readable price (buyToken per sellToken)",
+            },
+            sources: {
+              type: "array",
+              items: { type: "string" },
+              description: "DEX venues used for this quote (0x, Aerodrome, Uniswap, etc.)",
+            },
+            routingEngine: {
+              type: "string",
+              description: "Best-performing DEX for this swap",
+            },
+            tier: {
+              type: "string",
+              enum: ["basic", "resilient", "institutional"],
+              description: "Payment tier used",
+            },
+            expiresAt: {
+              type: "number",
+              description: "Unix timestamp when quote expires (15 seconds from request)",
+            },
+          },
+          required: ["status", "buyAmount", "price", "routingEngine"],
+        },
+      },
+    };
+
     return Response.json(
       {
         status: "ok",
@@ -583,6 +679,7 @@ export async function handleQuote(
         headers: {
           "X-Routing-Engine": routingMetadata?.winner ?? quote.sources[0]?.name ?? "0x",
           "EXTENSION-RESPONSES": btoa(JSON.stringify({ bazaar: { acknowledged: true, settled: true } })),
+          "X-Bazaar-Discovery": btoa(JSON.stringify(discoveryMetadata)),
         },
       }
     );
