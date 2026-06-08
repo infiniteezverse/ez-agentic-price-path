@@ -94,17 +94,17 @@ body {
 }
 `;
 
-const containerStyle: React.CSSProperties = {
+const containerStyle = {
   maxWidth: "1000px",
   margin: "0 auto",
 };
 
-const headerStyle: React.CSSProperties = {
+const headerStyle = {
   textAlign: "center",
   marginBottom: "60px",
 };
 
-const badgeStyle: React.CSSProperties = {
+const badgeStyle = {
   display: "inline-block",
   background: "#7c3aed",
   color: "white",
@@ -115,40 +115,40 @@ const badgeStyle: React.CSSProperties = {
   marginBottom: "20px",
 };
 
-const h1Style: React.CSSProperties = {
+const h1Style = {
   fontSize: "48px",
   fontWeight: "800",
   marginBottom: "15px",
   color: "#000",
 };
 
-const h3Style: React.CSSProperties = {
+const h3Style = {
   fontSize: "24px",
   marginBottom: "10px",
   color: "#000",
 };
 
-const h2Style: React.CSSProperties = {
+const h2Style = {
   fontSize: "32px",
   margin: "30px 0",
   textAlign: "center",
   color: "#000",
 };
 
-const subtitleStyle: React.CSSProperties = {
+const subtitleStyle = {
   fontSize: "20px",
   color: "#666",
   marginBottom: "30px",
 };
 
-const hubGridStyle: React.CSSProperties = {
+const hubGridStyle = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
   gap: "20px",
   marginBottom: "60px",
 };
 
-const hubCardStyle: React.CSSProperties = {
+const hubCardStyle = {
   background: "white",
   borderRadius: "12px",
   padding: "30px",
@@ -162,7 +162,7 @@ const hubCardStyle: React.CSSProperties = {
   cursor: "pointer",
 };
 
-const labelStyle: React.CSSProperties = {
+const labelStyle = {
   fontSize: "12px",
   textTransform: "uppercase",
   color: "#7c3aed",
@@ -171,7 +171,7 @@ const labelStyle: React.CSSProperties = {
   letterSpacing: "0.5px",
 };
 
-const urlStyle: React.CSSProperties = {
+const urlStyle = {
   fontFamily: "'Monaco', monospace",
   fontSize: "12px",
   background: "#f9fafb",
@@ -182,7 +182,7 @@ const urlStyle: React.CSSProperties = {
   marginBottom: "10px",
 };
 
-const statusBadgeStyle: React.CSSProperties = {
+const statusBadgeStyle = {
   display: "inline-block",
   padding: "4px 8px",
   borderRadius: "4px",
@@ -193,7 +193,7 @@ const statusBadgeStyle: React.CSSProperties = {
   color: "#065f46",
 };
 
-const featureListStyle: React.CSSProperties = {
+const featureListStyle = {
   background: "white",
   borderRadius: "12px",
   padding: "30px",
@@ -201,28 +201,28 @@ const featureListStyle: React.CSSProperties = {
   boxShadow: "0 4px 6px rgba(0, 0, 0, 0.07)",
 };
 
-const featuresGridStyle: React.CSSProperties = {
+const featuresGridStyle = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
   gap: "20px",
 };
 
-const featureStyle: React.CSSProperties = {
+const featureStyle = {
   display: "flex",
   gap: "12px",
 };
 
-const featureIconStyle: React.CSSProperties = {
+const featureIconStyle = {
   fontSize: "20px",
   flexShrink: 0,
 };
 
-const featureTextStyle: React.CSSProperties = {
+const featureTextStyle = {
   fontSize: "14px",
   color: "#666",
 };
 
-const footerStyle: React.CSSProperties = {
+const footerStyle = {
   textAlign: "center",
   color: "#999",
   fontSize: "14px",
