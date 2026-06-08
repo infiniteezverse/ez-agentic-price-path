@@ -70,14 +70,13 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
 
   const url = new URL(request.url);
 
-  // ── GET / — human landing page
-  if (url.pathname === "/" && request.method === "GET") {
-    return corsify(
-      new Response(LANDING_HTML, {
-        status: 200,
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      })
-    );
+  // ── GET|HEAD / — human landing page
+  if (url.pathname === "/" && (request.method === "GET" || request.method === "HEAD")) {
+    const response = new Response(request.method === "HEAD" ? null : LANDING_HTML, {
+      status: 200,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+    return corsify(response);
   }
 
   // ── GET|POST|PUT /api/v1/quote — Delegate to unified router

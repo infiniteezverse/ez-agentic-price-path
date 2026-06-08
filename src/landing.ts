@@ -138,6 +138,75 @@ export const LANDING_HTML = `<!DOCTYPE html>
     .cap-id { color: #58a6ff; margin-bottom: 0.15rem; }
     .cap-desc { color: #8b949e; font-size: 0.76rem; }
 
+    .quote-form {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+    }
+    .form-group {
+      margin-bottom: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .form-group label {
+      font-size: 0.8rem;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .form-group input {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 0.6rem 0.8rem;
+      color: #e6edf3;
+      font-family: inherit;
+      font-size: 0.9rem;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: #58a6ff;
+      box-shadow: 0 0 0 3px #58a6ff22;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    .btn {
+      background: #238636;
+      border: 1px solid #2ea043;
+      border-radius: 6px;
+      padding: 0.6rem 1.2rem;
+      color: #ffffff;
+      font-family: inherit;
+      font-size: 0.9rem;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .btn:hover { background: #2ea043; }
+    .btn:active { transform: scale(0.98); }
+    .btn.loading { opacity: 0.6; cursor: not-allowed; }
+
+    .response {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 1rem;
+      margin-top: 1rem;
+      font-size: 0.8rem;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .response-label { color: #8b949e; font-size: 0.7rem; margin-bottom: 0.5rem; }
+    .response-json { color: #79c0ff; }
+    .status-402 { color: #f85149; }
+    .status-200 { color: #3fb950; }
+
     footer {
       margin-top: 3rem;
       padding-top: 1.25rem;
@@ -176,6 +245,83 @@ export const LANDING_HTML = `<!DOCTYPE html>
       <div>Base64-encode the payload → retry with <code>X-Payment: &lt;payload&gt;</code> → receive normalized quote</div>
     </div>
   </div>
+
+  <h2>Try It</h2>
+  <div class="quote-form">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Sell Token</label>
+        <input type="text" id="sellToken" value="0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" placeholder="Token address (USDC on Base)">
+      </div>
+      <div class="form-group">
+        <label>Buy Token</label>
+        <input type="text" id="buyToken" value="0x4200000000000000000000000000000000000006" placeholder="Token address (WETH on Base)">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Sell Amount (atomic units)</label>
+      <input type="text" id="sellAmount" value="1000000" placeholder="1000000 (1 USDC)">
+    </div>
+    <button class="btn" onclick="getQuote()">Get Quote (402 Probe)</button>
+    <div id="quoteResult"></div>
+  </div>
+
+  <script>
+    async function getQuote() {
+      const sellToken = document.getElementById('sellToken').value;
+      const buyToken = document.getElementById('buyToken').value;
+      const sellAmount = document.getElementById('sellAmount').value;
+      const resultDiv = document.getElementById('quoteResult');
+      const btn = event.target;
+
+      if (!sellToken || !buyToken || !sellAmount) {
+        resultDiv.innerHTML = '<div class="response"><span style="color:#f85149;">All fields required</span></div>';
+        return;
+      }
+
+      btn.classList.add('loading');
+      btn.textContent = 'Loading...';
+
+      try {
+        const url = new URL('/api/v1/quote', window.location.origin);
+        url.searchParams.set('chain', 'base');
+        url.searchParams.set('sellToken', sellToken);
+        url.searchParams.set('buyToken', buyToken);
+        url.searchParams.set('sellAmount', sellAmount);
+
+        const response = await fetch(url, { method: 'GET' });
+        const data = await response.json();
+
+        const statusClass = response.status === 402 ? 'status-402' : 'status-200';
+        resultDiv.innerHTML = \`
+          <div class="response">
+            <div class="response-label">HTTP \${response.status} <span class="\${statusClass}">\${response.statusText}</span></div>
+            <pre style="margin:0;font-size:0.75rem">\${JSON.stringify(data, null, 2)}</pre>
+          </div>
+        \`;
+
+        if (response.status === 402) {
+          resultDiv.innerHTML += \`
+            <div style="background:#f8544422;border:1px solid #f8544466;border-radius:6px;padding:0.8rem;margin-top:1rem;font-size:0.8rem">
+              <div style="color:#f85149;font-weight:600;margin-bottom:0.5rem">✓ Payment Required (X402 Flow)</div>
+              <div style="color:#c9d1d9;line-height:1.5">
+                To unlock the full quote, sign an EIP-3009 <code>TransferWithAuthorization</code> for <code>\${data.unlock_fee_usd} USDC</code> and retry with the <code>X-Payment</code> header.
+              </div>
+            </div>
+          \`;
+        }
+      } catch (err) {
+        resultDiv.innerHTML = \`<div class="response"><span style="color:#f85149;">Error: \${err.message}</span></div>\`;
+      } finally {
+        btn.classList.remove('loading');
+        btn.textContent = 'Get Quote (402 Probe)';
+      }
+    }
+
+    document.getElementById('sellAmount').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') getQuote();
+    });
+  </script>
 
   <h2>Example</h2>
   <pre><span class="c"># Without payment — learn what's required</span>
