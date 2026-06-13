@@ -2,7 +2,7 @@
 
 ## Project Identity
 - **What it is:** Pay-per-request DEX meta-router on Base mainnet, deployed as a Cloudflare Worker
-- **Deploy command:** `npx wrangler deploy --config worker.toml` — NOT `wrangler.toml` (that's the Pages frontend)
+- **Deploy command:** `npx wrangler deploy --config worker.toml` — the Worker config is `worker.toml`, NOT `wrangler.jsonc` (that builds the separate TanStack Start frontend / `ez-agentic-price-path` Workers Build)
 - **Live URL:** https://ezpath.myezverse.xyz
 - **GitHub:** https://github.com/infiniteezverse/ez-agentic-price-path
 
@@ -30,10 +30,11 @@ Current metrics TTL: **172800s (48h)** — do not lower this below 90000s (25h).
 `METERING.list({ prefix: "metrics:" })` scans only metrics keys.
 **Rule:** The prefix in `etl.ts discoverKVKeys()` must always be `"metrics:"`.
 
-### 5. Cron triggers must be in `worker.toml`, not `wrangler.toml`
-`wrangler.toml` is for the TanStack/Pages frontend build. `worker.toml` is used for all Worker deploys.
-The scheduled ETL handler will silently never fire if `[triggers]` is only in `wrangler.toml`.
+### 5. Cron triggers must be in `worker.toml`
+`wrangler.jsonc` is for the TanStack Start frontend build (`ez-agentic-price-path`, deployed by the Git-integrated Cloudflare Workers Build). `worker.toml` is used for all router Worker deploys.
+The scheduled ETL handler will silently never fire if `[triggers]` is missing from `worker.toml`.
 **Rule:** `worker.toml` must always contain `[triggers] crons = ["0 2 * * *"]`. Confirm "schedule:" appears in deploy output.
+Do NOT re-add a root `wrangler.toml` — having both `wrangler.toml` and `wrangler.jsonc` present makes the Workers Build fail on ambiguous config. The router config lives in `worker.toml` only.
 
 ### 6. Never claim a feature that is not implemented in the code path
 Claimed in descriptions/docs = implemented in code. If not implemented, say "planned" or remove the claim.

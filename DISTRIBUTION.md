@@ -103,7 +103,7 @@
 
 **Real-time Volume**:
 ```bash
-ADMIN_API_KEY=5hZPT+4+z9kkgJ6nEnoztXSdqmHl/N0GhBnffzOEQN0= \
+ADMIN_API_KEY="<your-admin-api-key>" \
 ./scripts/monitor-ezpath-volume.sh
 ```
 
@@ -114,7 +114,7 @@ ADMIN_API_KEY=5hZPT+4+z9kkgJ6nEnoztXSdqmHl/N0GhBnffzOEQN0= \
 
 **Metrics API**:
 ```bash
-curl -H "Authorization: Bearer 5hZPT+4+z9kkgJ6nEnoztXSdqmHl/N0GhBnffzOEQN0=" \
+curl -H "Authorization: Bearer <your-admin-api-key>" \
   https://ezpath.myezverse.xyz/api/v1/metrics/operator/base/$(date +%Y-%m-%d)
 ```
 
