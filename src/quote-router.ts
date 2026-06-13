@@ -371,6 +371,14 @@ export async function handleQuote(
           maxTimeoutSeconds: 300,
         },
       ],
+      // Standardized DEX quote preview (required by Bazaar discovery)
+      sellToken: sellToken || "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      buyToken: buyToken || "0x4200000000000000000000000000000000000006",
+      sellAmount: sellAmount || "1000000",
+      buyAmount: null,
+      price: null,
+      sources: [],
+      estimatedGas: null,
       extensions: {
         bazaar: {
           resourceServerExtension: true,
@@ -379,31 +387,45 @@ export async function handleQuote(
             name: "EZ-Path DEX Router",
             description: "Pay-per-quote DEX meta-router on Base. Races 10 venues for best execution.",
             category: "dex",
-            input: {
-              sellToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-              buyToken: "0x4200000000000000000000000000000000000006",
-              sellAmount: "1000000",
-            },
-            output: {
-              buyAmount: "998500000000000000",
-              price: "0.9985",
-              sources: ["0x", "Uniswap V3"],
-            },
             pricing: { amount: "30000", asset: "USDC" },
             network: "base",
           },
+          output: {
+            example: {
+              sellToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+              buyToken: "0x4200000000000000000000000000000000000006",
+              sellAmount: "1000000",
+              buyAmount: "998500000000000000",
+              price: "0.9985",
+              sources: [
+                { name: "0x", proportion: "0.70" },
+                { name: "Uniswap V3", proportion: "0.30" },
+              ],
+              estimatedGas: "210000",
+            },
+          },
           schema: {
             type: "object",
-            additionalProperties: false,
             properties: {
+              sellToken: { type: "string" },
+              buyToken: { type: "string" },
+              sellAmount: { type: "string" },
               buyAmount: { type: "string" },
               price: { type: "string" },
-              sources: { type: "array", items: { type: "string" } },
-              settlementTx: { type: "string" },
-              executedAt: { type: "string" },
-              requestId: { type: "string" },
+              sources: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    proportion: { type: "string" },
+                  },
+                  required: ["name", "proportion"],
+                },
+              },
+              estimatedGas: { type: "string" },
             },
-            required: ["buyAmount", "price", "sources"],
+            required: ["sellToken", "buyToken", "sellAmount", "buyAmount", "price", "sources"],
           },
         },
       },
