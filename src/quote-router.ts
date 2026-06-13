@@ -355,6 +355,15 @@ export async function handleQuote(
     }
 
     const paymentRequired = {
+      // Standardized DEX quote fields (required by Bazaar discovery validator)
+      sellToken: null,
+      buyToken: null,
+      sellAmount: null,
+      buyAmount: null,
+      price: null,
+      sources: [],
+      estimatedGas: null,
+      // X402 v2 metadata
       x402Version: 2,
       resource: {
         url: "https://api.myezverse.xyz/api/v1/quote",
@@ -371,64 +380,96 @@ export async function handleQuote(
           maxTimeoutSeconds: 300,
         },
       ],
-      // Standardized DEX quote preview (required by Bazaar discovery)
-      sellToken: sellToken || "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-      buyToken: buyToken || "0x4200000000000000000000000000000000000006",
-      sellAmount: sellAmount || "1000000",
-      buyAmount: null,
-      price: null,
-      sources: [],
-      estimatedGas: null,
       extensions: {
         bazaar: {
           resourceServerExtension: true,
           discoveryExtension: true,
+          // Shape mandated by the x402 Go SDK's DiscoveryInfo union type
+          // (go/extensions/types/types.go). For an HTTP endpoint the SDK reads
+          // the method from info.input.method with info.input.type === "http".
+          // Anything else throws "failed to extract method/toolName".
           info: {
-            name: "EZ-Path DEX Router",
-            description: "DEX router on Base.",
-            category: "dex",
             input: {
-              sellToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-              buyToken: "0x4200000000000000000000000000000000000006",
-              sellAmount: "1000000",
+              type: "http",
+              method: "GET",
+              queryParams: {
+                sellToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+                buyToken: "0x4200000000000000000000000000000000000006",
+                sellAmount: "1000000",
+              },
             },
             output: {
-              sellToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-              buyToken: "0x4200000000000000000000000000000000000006",
-              sellAmount: "1000000",
-              buyAmount: "998500000000000000",
-              price: "0.9985",
-              sources: [
-                { name: "0x", proportion: "0.70" },
-                { name: "Uniswap V3", proportion: "0.30" },
-              ],
-              estimatedGas: "210000",
+              type: "json",
+              // DEX Router Best Quote example response
+              example: {
+                sellToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+                buyToken: "0x4200000000000000000000000000000000000006",
+                sellAmount: "1000000",
+                buyAmount: "998500000000000000",
+                price: "0.9985",
+                sources: [
+                  { name: "0x", proportion: "0.70" },
+                  { name: "Uniswap V3", proportion: "0.30" },
+                ],
+                estimatedGas: "210000",
+              },
             },
-            pricing: { amount: "30000", asset: "USDC" },
-            network: "base",
           },
+          // Schema validates the STRUCTURE of info (mirrors the SDK's
+          // createQueryDiscoveryExtension output).
           schema: {
+            $schema: "https://json-schema.org/draft/2020-12/schema",
             type: "object",
             properties: {
-              sellToken: { type: "string" },
-              buyToken: { type: "string" },
-              sellAmount: { type: "string" },
-              buyAmount: { type: "string" },
-              price: { type: "string" },
-              sources: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    name: { type: "string" },
-                    proportion: { type: "string" },
+              input: {
+                type: "object",
+                properties: {
+                  type: { type: "string", const: "http" },
+                  method: { type: "string", enum: ["GET"] },
+                  queryParams: {
+                    type: "object",
+                    properties: {
+                      sellToken: { type: "string" },
+                      buyToken: { type: "string" },
+                      sellAmount: { type: "string" },
+                    },
+                    required: ["sellToken", "buyToken", "sellAmount"],
                   },
-                  required: ["name", "proportion"],
                 },
+                required: ["type", "method"],
+                additionalProperties: false,
               },
-              estimatedGas: { type: "string" },
+              output: {
+                type: "object",
+                properties: {
+                  type: { type: "string" },
+                  example: {
+                    type: "object",
+                    properties: {
+                      sellToken: { type: "string" },
+                      buyToken: { type: "string" },
+                      sellAmount: { type: "string" },
+                      buyAmount: { type: "string" },
+                      price: { type: "string" },
+                      sources: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            name: { type: "string" },
+                            proportion: { type: "string" },
+                          },
+                          required: ["name", "proportion"],
+                        },
+                      },
+                      estimatedGas: { type: "string" },
+                    },
+                  },
+                },
+                required: ["type"],
+              },
             },
-            required: ["sellToken", "buyToken", "sellAmount", "buyAmount", "price", "sources"],
+            required: ["input"],
           },
         },
       },

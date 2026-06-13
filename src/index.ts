@@ -82,7 +82,7 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
   // ── GET|POST|PUT /api/v1/quote — Delegate to unified router
   if (url.pathname === "/api/v1/quote" && (request.method === "GET" || request.method === "POST" || request.method === "PUT")) {
     try {
-      return await handleQuote(request, env, ctx);
+      return corsify(await handleQuote(request, env, ctx));
     } catch (err) {
       const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
       console.error("[index.ts] handleQuote error:", detail);
