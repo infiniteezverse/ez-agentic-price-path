@@ -385,13 +385,14 @@ export async function handleQuote(
           discoveryExtension: true,
           info: {
             name: "EZ-Path DEX Router",
-            description: "Pay-per-quote DEX meta-router on Base. Races 10 venues for best execution.",
+            description: "DEX router on Base.",
             category: "dex",
-            pricing: { amount: "30000", asset: "USDC" },
-            network: "base",
-          },
-          output: {
-            example: {
+            input: {
+              sellToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+              buyToken: "0x4200000000000000000000000000000000000006",
+              sellAmount: "1000000",
+            },
+            output: {
               sellToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
               buyToken: "0x4200000000000000000000000000000000000006",
               sellAmount: "1000000",
@@ -403,6 +404,8 @@ export async function handleQuote(
               ],
               estimatedGas: "210000",
             },
+            pricing: { amount: "30000", asset: "USDC" },
+            network: "base",
           },
           schema: {
             type: "object",
