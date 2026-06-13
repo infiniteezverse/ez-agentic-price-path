@@ -377,9 +377,19 @@ export async function handleQuote(
           discoveryExtension: true,
           info: {
             name: "EZ-Path DEX Router",
-            description: "Pay-per-quote DEX meta-router on Base. Races 10 venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) for best execution.",
+            description: "Pay-per-quote DEX meta-router on Base. Races 10 venues for best execution.",
             category: "dex",
-            pricing: { amount: "30000", asset: "USDC", description: "0.03 USDC per quote" },
+            input: {
+              sellToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+              buyToken: "0x4200000000000000000000000000000000000006",
+              sellAmount: "1000000",
+            },
+            output: {
+              buyAmount: "998500000000000000",
+              price: "0.9985",
+              sources: ["0x", "Uniswap V3"],
+            },
+            pricing: { amount: "30000", asset: "USDC" },
             network: "base",
           },
           schema: {
