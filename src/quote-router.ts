@@ -363,7 +363,7 @@ export async function handleQuote(
       },
       accepts: [
         {
-          scheme: "eip3009",
+          scheme: "exact",
           network: "base",
           amount: String(PRICE_ATOMIC),
           asset: USDC_BASE,
@@ -375,6 +375,35 @@ export async function handleQuote(
         bazaar: {
           resourceServerExtension: true,
           discoveryExtension: true,
+          info: {
+            name: "EZ-Path DEX Router",
+            description: "Pay-per-quote DEX meta-router on Base. Races 10 venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) for best execution.",
+            category: "dex",
+            inputs: [
+              { name: "sellToken", type: "string", description: "Token address to swap from" },
+              { name: "buyToken", type: "string", description: "Token address to swap to" },
+              { name: "sellAmount", type: "string", description: "Amount to swap (in atomic units)" },
+            ],
+            outputs: [
+              { name: "buyAmount", type: "string", description: "Quote for output amount" },
+              { name: "price", type: "string", description: "Human-readable price" },
+              { name: "sources", type: "array", description: "DEX venues included in route" },
+            ],
+            pricing: { amount: "30000", asset: "USDC", description: "0.03 USDC per quote" },
+            network: "base",
+          },
+          schema: {
+            type: "object",
+            properties: {
+              buyAmount: { type: "string", description: "Output amount in atomic units" },
+              price: { type: "string", description: "Human-readable price (buyToken per sellToken)" },
+              sources: { type: "array", items: { type: "string" }, description: "DEX venues used" },
+              settlementTx: { type: "string", description: "Settlement transaction hash (if executed)" },
+              executedAt: { type: "string", description: "ISO timestamp of execution" },
+              requestId: { type: "string", description: "Request tracking ID" },
+            },
+            required: ["buyAmount", "price", "sources"],
+          },
         },
       },
     };
