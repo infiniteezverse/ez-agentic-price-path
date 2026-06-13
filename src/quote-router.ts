@@ -384,11 +384,22 @@ export async function handleQuote(
               { name: "buyToken", type: "string", description: "Token address to swap to" },
               { name: "sellAmount", type: "string", description: "Amount to swap (in atomic units)" },
             ],
+            input: {
+              sellToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+              buyToken: "0x4200000000000000000000000000000000000006",
+              sellAmount: "1000000",
+            },
             outputs: [
               { name: "buyAmount", type: "string", description: "Quote for output amount" },
               { name: "price", type: "string", description: "Human-readable price" },
               { name: "sources", type: "array", description: "DEX venues included in route" },
             ],
+            output: {
+              buyAmount: "998500000000000000",
+              price: "0.9985",
+              sources: ["0x", "Uniswap V3"],
+              requestId: "req-example-123",
+            },
             pricing: { amount: "30000", asset: "USDC", description: "0.03 USDC per quote" },
             network: "base",
           },
