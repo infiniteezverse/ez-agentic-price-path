@@ -395,10 +395,12 @@ export async function handleQuote(
               { name: "sources", type: "array", description: "DEX venues included in route" },
             ],
             output: {
-              buyAmount: "998500000000000000",
-              price: "0.9985",
-              sources: ["0x", "Uniswap V3"],
-              requestId: "req-example-123",
+              example: {
+                buyAmount: "998500000000000000",
+                price: "0.9985",
+                sources: ["0x", "Uniswap V3"],
+                requestId: "req-example-123",
+              },
             },
             pricing: { amount: "30000", asset: "USDC", description: "0.03 USDC per quote" },
             network: "base",
