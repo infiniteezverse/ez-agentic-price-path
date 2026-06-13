@@ -337,20 +337,15 @@ export async function handleQuote(
     }
   }
 
+  const paymentHeader = request.headers.get("X-Payment") ?? request.headers.get("payment-signature");
+
   // Extract quote params
   const sellToken = url.searchParams.get("sellToken");
   const buyToken = url.searchParams.get("buyToken");
   const sellAmount = url.searchParams.get("sellAmount");
   const slippagePercentage = url.searchParams.get("slippagePercentage");
 
-  const missing = ["sellToken", "buyToken", "sellAmount"].filter(k => !url.searchParams.get(k));
-  if (missing.length > 0) {
-    return Response.json({ status: "bad_request", missing, request_id: requestId }, { status: 400 });
-  }
-
-  const paymentHeader = request.headers.get("X-Payment") ?? request.headers.get("payment-signature");
-
-  // No payment: return 402
+  // No payment: return 402 (check payment BEFORE validating parameters)
   if (!paymentHeader) {
     if (!(await checkRateLimit("probe", clientIp, RL_PROBE_LIMIT, env.METERING, chain))) {
       return Response.json(
@@ -458,6 +453,12 @@ export async function handleQuote(
       { status: "rate_limited", retry_after: 60, request_id: requestId },
       { status: 429, headers: { "Retry-After": "60" } }
     );
+  }
+
+  // Validate required parameters (only after payment is verified)
+  const missing = ["sellToken", "buyToken", "sellAmount"].filter(k => !url.searchParams.get(k));
+  if (missing.length > 0) {
+    return Response.json({ status: "bad_request", missing, request_id: requestId }, { status: 400 });
   }
 
   // Payment verified - fetch real quote from chain
