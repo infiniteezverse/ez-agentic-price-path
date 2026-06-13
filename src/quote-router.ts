@@ -354,48 +354,41 @@ export async function handleQuote(
       );
     }
 
-    return Response.json(
-      {
-        // Standard x402 format (required by Base MCP + coinbase/x402 clients)
-        x402Version: 1,
-        accepts: [
-          {
-            scheme: "exact",
-            network: "base",
-            maxAmountRequired: String(PRICE_ATOMIC),
-            resource: "https://ezpath.myezverse.xyz/api/v1/quote",
-            description: "EZ-Path DEX Quote — races 10 venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) and returns the highest buyAmount",
-            mimeType: "application/json",
-            payTo: TOLL_ADDRESS,
-            maxTimeoutSeconds: 300,
-            asset: USDC_BASE,
-            extra: { name: "USD Coin", version: "2" },
-          },
-        ],
-        // EZ-Path extended metadata (backward compat)
-        status: "payment_required",
-        unlock_fee_usd: 0.03,
-        request_id: requestId,
-        tiers: {
-          basic: { min_atomic: "30000", min_usdc: 0.03, description: "Direct 0x execution" },
-          resilient: { min_atomic: "100000", min_usdc: 0.1, description: "Dual-lane concurrent race" },
-          institutional: { min_atomic: "500000", min_usdc: 0.5, description: "Dual-lane race + Uniswap V3 safety net" },
+    const paymentRequired = {
+      x402Version: 2,
+      resource: {
+        url: "https://api.myezverse.xyz/api/v1/quote",
+        description: "EZ-Path DEX Quote — races 10 venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) and returns the highest buyAmount",
+        mimeType: "application/json",
+      },
+      accepts: [
+        {
+          scheme: "eip3009",
+          network: "base",
+          amount: String(PRICE_ATOMIC),
+          asset: USDC_BASE,
+          payTo: TOLL_ADDRESS,
+          maxTimeoutSeconds: 300,
+        },
+      ],
+      extensions: {
+        bazaar: {
+          resourceServerExtension: true,
+          discoveryExtension: true,
         },
       },
-      {
-        status: 402,
-        headers: {
-          "WWW-Authenticate": 'X402 realm="EZ-Path DEX Router", scheme="eip3009", token="USDC", chain="base"',
-          "X-Payment-Required": "true",
-          "X-Payment-Header": "X-Payment",
-          "X-Payment-Scheme": "x402-eip3009",
-          "X-Payment-Chain": "eip155:8453",
-          "X-Payment-Token": USDC_BASE,
-          "X-Payment-Address": TOLL_ADDRESS,
-          "X-Payment-Manifest": "https://ezpath.myezverse.xyz/.well-known/agent.json",
-        },
-      }
-    );
+    };
+
+    const paymentJson = JSON.stringify(paymentRequired);
+    const paymentBase64 = btoa(unescape(encodeURIComponent(paymentJson)));
+
+    return Response.json(paymentRequired, {
+      status: 402,
+      headers: {
+        "PAYMENT-REQUIRED": paymentBase64,
+        "WWW-Authenticate": 'X402 realm="EZ-Path", scheme="eip3009", network="base"',
+      },
+    });
   }
 
   // Verify payment — 1) local EIP-3009, 2) CDP facilitator, 3) Base MCP smart wallet trust
