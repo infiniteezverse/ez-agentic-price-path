@@ -32,7 +32,7 @@ const res402 = await fetch(`${BASE}/api/v1/quote?sellToken=${USDC}&buyToken=${WE
 const body402 = await res402.json() as any;
 
 assert("Returns HTTP 402", res402.status === 402, `got ${res402.status}`);
-assert("x402Version = 1", body402.x402Version === 1);
+assert("x402Version = 2", body402.x402Version === 2);
 assert("accepts array present", Array.isArray(body402.accepts) && body402.accepts.length > 0);
 assert("accepts[0].scheme = exact", body402.accepts?.[0]?.scheme === "exact");
 assert("accepts[0].network = base", body402.accepts?.[0]?.network === "base");
@@ -80,11 +80,12 @@ assert("llms.md: correct toll address", llmsMd.includes(TOLL));
 
 console.log("\n── Error Handling ──");
 
-const res400 = await fetch(`${BASE}/api/v1/quote?sellToken=${USDC}&buyToken=${WETH}`); // missing sellAmount
-const body400 = await res400.json() as any;
-assert("Missing param → 400", res400.status === 400);
-assert("400 body has missing[] array", Array.isArray(body400.missing));
-assert("400 body identifies sellAmount as missing", body400.missing?.includes("sellAmount"));
+// Payment-first semantics (required for x402 Bazaar discovery): an UNPAID request
+// returns 402 with payment instructions even when params are incomplete. Param
+// validation happens AFTER payment is verified, so it returns 400 only to paying
+// clients that omit a param.
+const res402b = await fetch(`${BASE}/api/v1/quote?sellToken=${USDC}&buyToken=${WETH}`); // missing sellAmount, unpaid
+assert("Unpaid + missing param → 402 (payment-first)", res402b.status === 402);
 
 const res401 = await fetch(`${BASE}/api/v1/quote?sellToken=${USDC}&buyToken=${WETH}&sellAmount=1000000`, {
   headers: { "X-Payment": "invalid_garbage_base64" },

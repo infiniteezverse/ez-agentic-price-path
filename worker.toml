@@ -1,6 +1,9 @@
 name = "ezpath-router"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
+# nodejs_compat provides the Buffer/process globals that @coinbase/cdp-sdk (jose)
+# needs to sign the CDP facilitator JWT. Required for Bazaar-indexing settlement.
+compatibility_flags = ["nodejs_compat"]
 account_id = "8006c17f0bd3f3b0e8b7979097fc87ed"
 
 [vars]

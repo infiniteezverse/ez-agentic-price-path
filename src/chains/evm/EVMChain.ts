@@ -54,6 +54,8 @@ interface Env {
   PARASWAP_API_KEY?: string;
   RELAYER_PRIVATE_KEY?: string;
   CDP_FACILITATOR_URL?: string;
+  CDP_API_KEY_NAME?: string;
+  CDP_API_KEY_PRIVATE_KEY?: string;
   METERING: KVNamespace;
   SUPABASE_URL: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
@@ -383,6 +385,8 @@ export abstract class EVMChain implements IChain {
         this.config.tollAddress ?? "0x13dDE704389b1118B20d2BCc6D3Ace749600e2ad",
         this.config.paymentToken,
         rawPayload,
+        this.env.CDP_API_KEY_NAME,
+        this.env.CDP_API_KEY_PRIVATE_KEY,
       );
       facilitatorSucceeded = true;
       // Upgrade nonce record to actual tx hash
