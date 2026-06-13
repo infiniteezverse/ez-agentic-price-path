@@ -375,11 +375,22 @@ export async function handleQuote(
           scheme: "exact",
           network: "base",
           amount: String(PRICE_ATOMIC),
+          // v1 back-compat: standard x402 clients read maxAmountRequired / extra / mimeType
+          maxAmountRequired: String(PRICE_ATOMIC),
           asset: USDC_BASE,
           payTo: TOLL_ADDRESS,
           maxTimeoutSeconds: 300,
+          mimeType: "application/json",
+          extra: { name: "USD Coin", version: "2" },
         },
       ],
+      // v1 back-compat: tiered pricing + request id for existing (pre-Bazaar) consumers
+      tiers: {
+        basic: { min_atomic: TIER_BASIC_ATOMIC, usd: "0.03", description: "direct 0x" },
+        resilient: { min_atomic: TIER_RESILIENT_ATOMIC, usd: "0.10", description: "4-venue race" },
+        institutional: { min_atomic: TIER_INSTITUTIONAL_ATOMIC, usd: "0.50", description: "all 10 venues" },
+      },
+      request_id: requestId,
       extensions: {
         bazaar: {
           resourceServerExtension: true,
@@ -483,6 +494,9 @@ export async function handleQuote(
       headers: {
         "PAYMENT-REQUIRED": paymentBase64,
         "WWW-Authenticate": 'X402 realm="EZ-Path", scheme="eip3009", network="base"',
+        // v1 back-compat headers for existing (pre-Bazaar) consumers
+        "X-Payment-Address": TOLL_ADDRESS,
+        "X-Payment-Token": USDC_BASE,
       },
     });
   }
