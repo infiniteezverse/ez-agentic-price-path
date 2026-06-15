@@ -8,7 +8,7 @@ import { generateJwt } from "@coinbase/cdp-sdk/auth";
 
 export interface AuthData {
     from: string;
-    to: string;
+    to: string
     value: string;
     validAfter: string;
     validBefore: string;
@@ -125,7 +125,11 @@ export async function settleThroughFacilitator(
           paymentPayload = {
                   ...(rawPayload as Record<string, unknown>),
                   // resource is the catalog key — CDP indexes by paymentPayload.resource
-                  resource: RESOURCE_URL,
+                  resource: {
+                    url: RESOURCE_URL,
+                    description: "Best-execution DEX quote on Base — races 10 venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) and returns the highest buyAmount",
+                    mimeType: "application/json",
+                  },
                   extensions: { bazaar: BAZAAR_EXTENSION },
           };
     } else {
@@ -133,7 +137,11 @@ export async function settleThroughFacilitator(
                   x402Version: 1,
                   scheme: "exact",
                   network: "base",
-                  resource: RESOURCE_URL,
+                  resource: {
+                    url: RESOURCE_URL,
+                    description: "Best-execution DEX quote on Base — races 10 venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) and returns the highest buyAmount",
+                    mimeType: "application/json",
+                  },
                   payload: { signature: sig, authorization: auth },
                   extensions: { bazaar: BAZAAR_EXTENSION },
           };
