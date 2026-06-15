@@ -7,7 +7,6 @@ on:
       - 'src/**'
       - 'worker.toml'
       - 'package.json'
-      - 'package-lock.json'
       - 'tsconfig*.json'
   workflow_dispatch:
 
@@ -22,10 +21,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --legacy-peer-deps
 
       - name: Deploy to Cloudflare Workers
         run: npx wrangler deploy --config worker.toml
