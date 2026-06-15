@@ -1,7 +1,7 @@
 #!/bin/bash
 
 API_URL="https://ezpath.myezverse.xyz"
-ADMIN_KEY="5hZPT+4+z9kkgJ6nEnoztXSdqmHl/N0GhBnffzOEQN0="
+ADMIN_KEY="${ADMIN_API_KEY:?Set ADMIN_API_KEY in your environment}"
 
 USDC="0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 WETH="0x4200000000000000000000000000000000000006"
