@@ -152,7 +152,7 @@ async function checkRateLimit(
     return true;
   } catch (err) {
     // SECURITY: Fail closed (deny) on KV errors to prevent bypass attacks
-    console.error(`[rate-limit] KV check failed for ${category}/${id}: ${err instanceof Error ? err.message : err}`);
+    console.error(`[rate-limit] KV check failed for ${category}/${identifier}: ${err instanceof Error ? err.message : err}`);
     return false; // fail closed — safer than allowing on errors
   }
 }
