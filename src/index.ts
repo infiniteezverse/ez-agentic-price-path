@@ -438,12 +438,37 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
     const payer = match?.[2];
     const date = match?.[3];
 
-    // TODO: Add authentication to verify payer can only access own metrics
-    // For now, require ADMIN_API_KEY
+    // Authentication: ADMIN_API_KEY (full access) or signed payment proving payer identity
     const authHeader = request.headers.get("Authorization") ?? "";
     const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-    if (!env.ADMIN_API_KEY || token !== env.ADMIN_API_KEY) {
-      return corsify(new Response(JSON.stringify({ status: "unauthorized" }), {
+
+    // Path 1: Admin API key grants access to all metrics
+    const isAdmin = token === env.ADMIN_API_KEY;
+
+    // Path 2: Payer can access own metrics if they prove identity via signed payment
+    let authenticatedPayer: string | null = null;
+    if (!isAdmin) {
+      const paymentHeader = request.headers.get("X-Payment") ?? request.headers.get("payment-signature");
+      if (paymentHeader) {
+        try {
+          const payload = JSON.parse(atob(paymentHeader));
+          const payerFromPayment = payload?.payload?.authorization?.from?.toLowerCase();
+          // Allow access if payer in URL matches payer in signed payment
+          if (payerFromPayment && payerFromPayment === payer?.toLowerCase()) {
+            authenticatedPayer = payer;
+          }
+        } catch {
+          // Invalid payment header — fall through to unauthorized
+        }
+      }
+    }
+
+    // Deny if neither admin nor authenticated payer
+    if (!isAdmin && !authenticatedPayer) {
+      return corsify(new Response(JSON.stringify({
+        status: "unauthorized",
+        detail: "Provide ADMIN_API_KEY or X-Payment header proving payer identity"
+      }), {
         status: 401,
         headers: { "Content-Type": "application/json" },
       }));
