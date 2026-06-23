@@ -13,7 +13,7 @@ alias = {
 [vars]
 CDP_FACILITATOR_URL = "https://x402.org/facilitator"
 SUPABASE_URL = "https://dikmzrgwpjbdnrauffzs.supabase.co"
-ADMIN_API_KEY = "5hZPT+4+z9kkgJ6nEnoztXSdqmHl/N0GhBnffzOEQN0="
+# ADMIN_API_KEY moved to Cloudflare secrets (use: wrangler secret put ADMIN_API_KEY --config worker.toml)
 
 [[kv_namespaces]]
 binding = "METERING"

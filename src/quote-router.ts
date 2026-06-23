@@ -65,6 +65,21 @@ interface AuthData {
   nonce: string;
 }
 
+// Input validation helpers
+function isValidEthereumAddress(addr: string): boolean {
+  return /^0x[a-fA-F0-9]{40}$/i.test(addr);
+}
+
+function isValidSellAmount(amount: string): boolean {
+  try {
+    const bn = BigInt(amount);
+    // Must be positive and less than 2^256
+    return bn > 0n && bn < BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639936");
+  } catch {
+    return false;
+  }
+}
+
 type VerifyResult =
   | {
       isValid: false;
@@ -135,8 +150,10 @@ async function checkRateLimit(
     if (count >= limit) return false;
     await kv.put(key, String(count + 1), { expirationTtl: 120 });
     return true;
-  } catch {
-    return true; // fail open
+  } catch (err) {
+    // SECURITY: Fail closed (deny) on KV errors to prevent bypass attacks
+    console.error(`[rate-limit] KV check failed for ${category}/${id}: ${err instanceof Error ? err.message : err}`);
+    return false; // fail closed — safer than allowing on errors
   }
 }
 
@@ -623,6 +640,26 @@ export async function handleQuote(
     return Response.json({ status: "bad_request", missing, request_id: requestId }, { status: 400 });
   }
 
+  // Validate parameter formats (SECURITY: prevent invalid input from reaching venues)
+  if (!isValidEthereumAddress(sellToken!)) {
+    return Response.json(
+      { status: "bad_request", detail: "sellToken must be valid Ethereum address (0x...)", request_id: requestId },
+      { status: 400 }
+    );
+  }
+  if (!isValidEthereumAddress(buyToken!)) {
+    return Response.json(
+      { status: "bad_request", detail: "buyToken must be valid Ethereum address (0x...)", request_id: requestId },
+      { status: 400 }
+    );
+  }
+  if (!isValidSellAmount(sellAmount!)) {
+    return Response.json(
+      { status: "bad_request", detail: "sellAmount must be positive integer (wei)", request_id: requestId },
+      { status: 400 }
+    );
+  }
+
   // Payment verified - fetch real quote from chain
   const now = Date.now();
   const expiresAt = now + (EXECUTION_TTL_SECONDS * 1000);
@@ -855,6 +892,7 @@ export async function handleQuote(
       {
         status: 200,
         headers: {
+          "Cache-Control": "private, max-age=15, no-store", // Enforce 15s execution window — agents must not cache past expiresAt
           "X-Routing-Engine": routingMetadata?.winner ?? quote.sources[0]?.name ?? "0x",
           "EXTENSION-RESPONSES": btoa(JSON.stringify({ bazaar: { acknowledged: true, settled: true } })),
           "X-Bazaar-Discovery": btoa(JSON.stringify(discoveryMetadata)),
