@@ -44,16 +44,43 @@ Previous false claims removed: "Flashbots MEV protection" (never wired up).
 A venue that returns 4xx or redirects counts as broken. Broken venues fail silently (timeout wrapper catches all errors), but they waste the race budget.
 **Rule:** When adding/modifying a venue in `src/chains/evm/venues.ts`, run `npm run test:venues` to confirm the API returns a valid non-zero buyAmount.
 
+### 8. Rate limiting must fail CLOSED, never open
+If KV namespace is unavailable, deny the request (return false). Fail-open allows attackers to bypass rate limits during KV degradation.
+**Rule:** `checkRateLimit()` returns `false` on KV errors, with explicit error logging. Review all calls to this function.
+
+### 9. Input validation is pre-venue — prevent malformed requests from reaching upstream APIs
+All user inputs (token addresses, amounts) must be validated BEFORE being sent to venue APIs. Invalid inputs should return 400, not timeout.
+**Rule:** Use `isValidEthereumAddress()` for token parameters, `isValidSellAmount()` for amount parameters, in paid quote paths.
+
+### 10. Secrets must never be in plaintext files in git
+ADMIN_API_KEY, API keys, and private keys must be set via `wrangler secret put`, never hardcoded in wrangler.toml or .env files that are committed.
+**Rule:** All secrets set in Cloudflare dashboard or via CLI. Verify with `wrangler secret list --config worker.toml`. No plaintext secrets in any config files.
+
+### 11. Cache-Control headers must enforce execution TTL
+Quotes expire at `expiresAt` (15 seconds). CDNs and browsers must not cache past this window.
+**Rule:** Quote responses (200) include `Cache-Control: private, max-age=15, no-store`. Payment-required responses (402) have no cache headers.
+
 ---
 
 ## Pre-Deploy Checklist
 Before running `npx wrangler deploy --config worker.toml`:
 
+### Tests
 - [ ] Run `npm run test:unit` — calculatePrice, determineTier, verifyPayment must pass
 - [ ] Run `npm run test:smoke` — live 402 response must have x402Version, accepts, tiers
-- [ ] Confirm `[triggers] crons = ["0 2 * * *"]` is in `worker.toml`
+
+### Configuration
+- [ ] Confirm `[triggers] crons = ["0 2 * * *"]` is in `worker.toml` (NOT wrangler.toml)
 - [ ] Confirm deploy output shows `schedule: 0 2 * * *`
+- [ ] Verify no secrets in plaintext: `grep -r "ADMIN_API_KEY\|PRIVATE_KEY\|SECRET" worker.toml wrangler.toml .env`
+- [ ] Confirm ADMIN_API_KEY is set as secret: `wrangler secret list --config worker.toml | grep ADMIN_API_KEY`
 - [ ] If changing tier descriptions: verify they match what `EVMChain.ts` actually does
+
+### Security Review
+- [ ] Check `checkRateLimit()` returns `false` (not true) on KV errors
+- [ ] Verify input validation for token addresses and amounts exists
+- [ ] Confirm Cache-Control header on 200 responses includes `max-age=15, no-store`
+- [ ] Search for hardcoded API keys or private keys: `grep -r "0x[a-f0-9]{64}\|[A-Za-z0-9+/=]{40,}" src/ --include="*.ts"` (caveat: will match test vectors)
 
 ---
 
