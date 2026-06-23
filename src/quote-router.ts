@@ -80,6 +80,115 @@ function isValidSellAmount(amount: string): boolean {
   }
 }
 
+// Build 402 Payment Required response (with optional error status)
+function build402Response(
+  requestId: string,
+  errorStatus?: string,
+  estimatedPrice?: string | null,
+  priceUsdEstimate?: string | null
+) {
+  const body: any = {
+    sellToken: null,
+    buyToken: null,
+    sellAmount: null,
+    buyAmount: null,
+    price: null,
+    sources: [],
+    estimatedGas: null,
+    estimatedPrice: estimatedPrice ?? null,
+    priceUsdEstimate: priceUsdEstimate ?? null,
+    x402Version: 2,
+    resource: {
+      url: "https://api.myezverse.xyz/api/v1/quote",
+      description: "EZ-Path DEX Quote — races 10 venues (0x, ParaSwap, Aerodrome, Uniswap V3, Curve, Balancer, Uniswap V2, 1Inch, CoW, Synthetix) and returns the highest buyAmount",
+      mimeType: "application/json",
+    },
+    accepts: [
+      {
+        scheme: "exact",
+        network: "base",
+        amount: String(PRICE_ATOMIC),
+        maxAmountRequired: String(PRICE_ATOMIC),
+        asset: USDC_BASE,
+        payTo: TOLL_ADDRESS,
+        maxTimeoutSeconds: 300,
+        mimeType: "application/json",
+        extra: { name: "USD Coin", version: "2" },
+      },
+    ],
+    tiers: {
+      basic: { min_atomic: TIER_BASIC_ATOMIC, usd: "0.03", description: "direct 0x" },
+      resilient: { min_atomic: TIER_RESILIENT_ATOMIC, usd: "0.10", description: "4-venue race" },
+      institutional: { min_atomic: TIER_INSTITUTIONAL_ATOMIC, usd: "0.50", description: "all 10 venues" },
+    },
+    request_id: requestId,
+    extensions: {
+      bazaar: {
+        resourceServerExtension: true,
+        discoveryExtension: true,
+        info: {
+          input: {
+            type: "http",
+            method: "GET",
+            queryParams: {
+              sellToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+              buyToken: "0x4200000000000000000000000000000000000006",
+              sellAmount: "1000000",
+            },
+          },
+          output: {
+            type: "json",
+            example: {
+              sellToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+              buyToken: "0x4200000000000000000000000000000000000006",
+              sellAmount: "1000000",
+              buyAmount: "998500000000000000",
+              price: "0.9985",
+              sources: [
+                { name: "0x", proportion: "0.70" },
+                { name: "Uniswap V3", proportion: "0.30" },
+              ],
+              estimatedGas: "210000",
+            },
+          },
+        },
+        schema: {
+          $schema: "https://json-schema.org/draft/2020-12/schema",
+          type: "object",
+          properties: {
+            input: {
+              type: "object",
+              properties: {
+                type: { type: "string", const: "http" },
+                method: { type: "string", enum: ["GET"] },
+                queryParams: {
+                  type: "object",
+                  properties: {
+                    sellToken: { type: "string" },
+                    buyToken: { type: "string" },
+                    sellAmount: { type: "string" },
+                  },
+                  required: ["sellToken", "buyToken", "sellAmount"],
+                },
+              },
+              required: ["type", "method"],
+              additionalProperties: false,
+            },
+          },
+        },
+      },
+    },
+  };
+
+  // Add error status if rate-limited
+  if (errorStatus) {
+    body.status = errorStatus;
+    body.retry_after = 60;
+  }
+
+  return body;
+}
+
 type VerifyResult =
   | {
       isValid: false;
@@ -365,12 +474,12 @@ export async function handleQuote(
   // No payment: return 402 (check payment BEFORE validating parameters)
   if (!paymentHeader) {
     if (!(await checkRateLimit("probe", clientIp, RL_PROBE_LIMIT, env.METERING, chain))) {
-      // X402 SPEC: Probes must return 402 (payment required), not 429
-      // Rate limiting is indicated in response body, not status code
-      return Response.json(
-        { status: "rate_limited", retry_after: 60, request_id: requestId, x402Version: 2 },
-        { status: 402, headers: { "Retry-After": "60" } }
-      );
+      // X402 SPEC: Probes must return full 402 structure even when rate limited
+      const rateLimitResponse = build402Response(requestId, "rate_limited");
+      return Response.json(rateLimitResponse, {
+        status: 402,
+        headers: { "Retry-After": "60" }
+      });
     }
 
     // Try to get live price for probe (free routing, no settlement)
