@@ -354,6 +354,35 @@ export async function handleQuote(
       );
     }
 
+    // Try to get live price for probe (free routing, no settlement)
+    let estimatedPrice: string | null = null;
+    let priceUsdEstimate: string | null = null;
+    try {
+      if (sellToken && buyToken && sellAmount) {
+        const chainRegistry = createChainRegistry(env, env.METERING);
+        const chainImpl = getChain(chainRegistry, chain);
+        const probeQuote = await chainImpl.fetchQuote({
+          sellToken,
+          buyToken,
+          sellAmount,
+          slippagePercentage: slippagePercentage ?? undefined,
+        });
+        if (probeQuote?.buyAmount) {
+          estimatedPrice = calculatePrice(probeQuote.buyAmount, buyToken, sellAmount, sellToken);
+          // Normalize: always USDC per buyToken
+          if (sellToken.toLowerCase() === USDC_BASE.toLowerCase()) {
+            priceUsdEstimate = parseFloat(estimatedPrice) > 0 ? (1 / parseFloat(estimatedPrice)).toFixed(6) : "0";
+          } else if (buyToken.toLowerCase() === USDC_BASE.toLowerCase()) {
+            priceUsdEstimate = estimatedPrice;
+          } else {
+            priceUsdEstimate = estimatedPrice;
+          }
+        }
+      }
+    } catch {
+      // Probe routing failed - that's ok, return without estimated price
+    }
+
     const paymentRequired = {
       // Standardized DEX quote fields (required by Bazaar discovery validator)
       sellToken: null,
@@ -363,6 +392,9 @@ export async function handleQuote(
       price: null,
       sources: [],
       estimatedGas: null,
+      // Live price estimates from probe (if routing succeeded)
+      estimatedPrice: estimatedPrice ?? null,
+      priceUsdEstimate: priceUsdEstimate ?? null,
       // X402 v2 metadata
       x402Version: 2,
       resource: {
@@ -611,6 +643,20 @@ export async function handleQuote(
 
     const totalLatencyMs = Date.now() - quoteStart;
     const price = calculatePrice(quote.buyAmount, buyToken!, sellAmount!, sellToken!);
+
+    // Normalize price: always USDC per buyToken (for agent simplicity)
+    let priceUsd: string;
+    if (sellToken?.toLowerCase() === USDC_BASE.toLowerCase()) {
+      // Selling USDC → invert to get USDC per buyToken
+      priceUsd = parseFloat(price) > 0 ? (1 / parseFloat(price)).toFixed(6) : "0";
+    } else if (buyToken?.toLowerCase() === USDC_BASE.toLowerCase()) {
+      // Buying USDC → price already is USDC per sellToken (what we want)
+      priceUsd = price;
+    } else {
+      // Neither side is USDC → return raw price (can't express in USDC without external rates)
+      priceUsd = price;
+    }
+
     const feeAtomic = Number(verification.auth.value);
     const winner = routingMetadata?.winner ?? quote.sources[0]?.name ?? "0x";
 
@@ -772,6 +818,7 @@ export async function handleQuote(
         sellAmount: quote.sellAmount,
         buyAmount: quote.buyAmount,
         price,
+        priceUsd, // Standard format: USDC per buyToken
         sources: quote.sources.map(s => s.name),
         routingEngine: routingMetadata?.winner ?? quote.sources[0]?.name ?? "unknown",
         tier,
