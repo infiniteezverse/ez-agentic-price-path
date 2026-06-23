@@ -111,27 +111,35 @@ EZ-Path underwent comprehensive security audit covering:
 
 ---
 
-## Remaining Items (Lower Priority)
+## Remaining Items (Lower Priority) ✅ FIXED
 
-### Status: 🟡 MEDIUM (Being Fixed)
+### 1. npm Dependency Vulnerabilities
+- **Status:** ✅ FIXED
+- **Action:** Ran `npm audit fix --legacy-peer-deps`
+- **Results:** Fixed 45 packages, updated @babel/core, esbuild, form-data, hono, js-yaml
+- **Remaining:** 31 CVEs in dev dependencies (ws, miniflare) — not used in production Cloudflare Worker
+- **Commit:** `c6e9a27` (chore: Run npm audit fix...)
 
-1. **npm Dependency Vulnerabilities**
-   - 9 high-severity CVEs in dependencies (Babel, esbuild, hono, etc.)
-   - Fix: Run `npm audit fix` and test
-   - Status: ⏳ In Progress
+### 2. Metrics Endpoint Payer Authentication
+- **Status:** ✅ FIXED
+- **Location:** `/src/index.ts:441-472`
+- **Fix Implemented:**
+  - ADMIN_API_KEY: grants access to all payer metrics
+  - Signed X-Payment header: payer can access own metrics
+  - Extracts payer from signed payment authorization
+  - Only allows access if URL payer matches signed payer
+- **Security Impact:** Prevents one payer from accessing another's metrics
+- **Commit:** `12ba50c` (fix: Implement payer authentication...)
 
-2. **Metrics Endpoint Payer Authentication**
-   - Allows any payer to access any other payer's metrics
-   - Location: `/src/index.ts:441` (TODO comment)
-   - Fix: Extract payer from signed payment, compare to URL parameter
-   - Status: ⏳ In Progress
+### 3. Facilitator URL Hardcoded
+- **Status:** ✅ Documented (acceptable)
+- **Behavior:** Falls back to `https://x402.org/facilitator` if env var not set
+- **Reason:** Provides safe fallback for non-production use; Bazaar discovery requires CDP Facilitator
 
-3. **Facilitator URL Hardcoded**
-   - Falls back to `https://x402.org/facilitator` if env var not set
-   - Status: ✅ Documented (acceptable for fallback behavior)
-
-4. **Metrics TTL Comment Clarity**
-   - Status: ✅ Fixed in CLAUDE.md (clarified 26h minimum calculation)
+### 4. Metrics TTL Comment Clarity
+- **Status:** ✅ Fixed
+- **Location:** `/CLAUDE.md` Rule #3
+- **Change:** Clarified 48h TTL calculation = 26h (24h + 2h buffer) to ETL window
 
 ---
 
