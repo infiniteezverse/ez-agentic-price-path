@@ -476,7 +476,8 @@ export async function handleQuote(
     if (!(await checkRateLimit("probe", clientIp, RL_PROBE_LIMIT, env.METERING, chain))) {
       // X402 V2 SPEC: Payment requirements go in PAYMENT-REQUIRED header (base64), not body
       const rateLimitResponse = build402Response(requestId, "rate_limited");
-      const paymentRequiredHeader = btoa(JSON.stringify(rateLimitResponse));
+      const paymentJson = JSON.stringify(rateLimitResponse);
+      const paymentRequiredHeader = btoa(unescape(encodeURIComponent(paymentJson)));
       return Response.json(rateLimitResponse, {
         status: 402,
         headers: {
