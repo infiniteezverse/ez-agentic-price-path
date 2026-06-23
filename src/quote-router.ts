@@ -365,9 +365,11 @@ export async function handleQuote(
   // No payment: return 402 (check payment BEFORE validating parameters)
   if (!paymentHeader) {
     if (!(await checkRateLimit("probe", clientIp, RL_PROBE_LIMIT, env.METERING, chain))) {
+      // X402 SPEC: Probes must return 402 (payment required), not 429
+      // Rate limiting is indicated in response body, not status code
       return Response.json(
-        { status: "rate_limited", retry_after: 60, request_id: requestId },
-        { status: 429, headers: { "Retry-After": "60" } }
+        { status: "rate_limited", retry_after: 60, request_id: requestId, x402Version: 2 },
+        { status: 402, headers: { "Retry-After": "60" } }
       );
     }
 
