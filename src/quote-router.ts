@@ -355,18 +355,44 @@ export async function handleQuote(
     }
 
     // Try to get live price for probe (free routing, no settlement)
+    // Strategy: Try 0x first (fastest), fall back to ParaSwap if it fails
     let estimatedPrice: string | null = null;
     let priceUsdEstimate: string | null = null;
     try {
       if (sellToken && buyToken && sellAmount) {
         const chainRegistry = createChainRegistry(env, env.METERING);
         const chainImpl = getChain(chainRegistry, chain);
-        const probeQuote = await chainImpl.fetchQuote({
-          sellToken,
-          buyToken,
-          sellAmount,
-          slippagePercentage: slippagePercentage ?? undefined,
-        });
+
+        let probeQuote: any = null;
+
+        // Try 0x first (fastest)
+        try {
+          probeQuote = await chainImpl.fetchQuote({
+            sellToken,
+            buyToken,
+            sellAmount,
+            slippagePercentage: slippagePercentage ?? undefined,
+          });
+        } catch (zeroExErr) {
+          console.log(`[probe] 0x failed: ${zeroExErr instanceof Error ? zeroExErr.message : zeroExErr}`);
+
+          // Fallback to ParaSwap if 0x fails
+          try {
+            const { fetchParaSwapQuote } = await import('./chains/evm/venues.js');
+            probeQuote = await fetchParaSwapQuote(
+              sellToken,
+              buyToken,
+              sellAmount,
+              chain === 'base' ? '8453' : chain === 'arbitrum' ? '42161' : '1',
+              slippagePercentage,
+              env.PARASWAP_API_KEY
+            );
+            console.log(`[probe] ParaSwap fallback succeeded`);
+          } catch (paraswapErr) {
+            console.log(`[probe] ParaSwap also failed: ${paraswapErr instanceof Error ? paraswapErr.message : paraswapErr}`);
+          }
+        }
+
         if (probeQuote?.buyAmount) {
           estimatedPrice = calculatePrice(probeQuote.buyAmount, buyToken, sellAmount, sellToken);
           // Normalize: always USDC per buyToken
@@ -379,8 +405,9 @@ export async function handleQuote(
           }
         }
       }
-    } catch {
-      // Probe routing failed - that's ok, return without estimated price
+    } catch (err) {
+      // Probe routing failed completely - that's ok, return without estimated price
+      console.log(`[probe] routing failed: ${err instanceof Error ? err.message : err}`);
     }
 
     const paymentRequired = {
